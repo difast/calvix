@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+venv/
+env/
+
+# Secrets
+.env
+bot.db
+*.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Logs
+*.log
