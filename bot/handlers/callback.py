@@ -6,6 +6,7 @@ from bot.fsm.booking import BookingStates
 from bot.services.booking import create_booking, validate_phone, validate_datetime
 from bot.services.business_loader import BusinessLoader
 from bot.services.analytics import analytics
+from bot.services.supabase_sync import supabase_sync
 from bot.repositories import LeadRepository
 from bot.config import settings
 
@@ -79,6 +80,7 @@ def create_callback_router() -> Router:
         scheduled_datetime = state_data.get("scheduled_datetime")
         lead_id = state_data.get("lead_id")
         business_id = kwargs.get("business_id", 1)
+        business = kwargs.get("business")
 
         if not all([phone, scheduled_datetime]):
             await callback.message.answer("❌ Ошибка. Начните запись заново.")
@@ -97,8 +99,10 @@ def create_callback_router() -> Router:
                 "scheduled_datetime": scheduled_datetime
             })
 
-            # Уведомление админу
+            # Получаем данные лида
             lead = await lead_repo.get(lead_id) if lead_id else None
+
+            # Уведомление админу
             for admin_id in settings.admin_ids:
                 try:
                     await callback.bot.send_message(
@@ -112,6 +116,21 @@ def create_callback_router() -> Router:
                     )
                 except Exception as e:
                     print(f"Ошибка уведомления: {e}")
+
+            # Синхронизация с Supabase
+            try:
+                await supabase_sync.push_booking(
+                    business_id=business_id,
+                    business_name=business.name if business else "Неизвестно",
+                    telegram_id=lead.telegram_id if lead else 0,
+                    username=lead.username if lead else "",
+                    full_name=lead.full_name if lead else "Неизвестно",
+                    phone=phone,
+                    scheduled_datetime=scheduled_datetime
+                )
+            except Exception as e:
+                print(f"Supabase booking sync error: {e}")
+
         else:
             await callback.message.answer("❌ Ошибка записи. Попробуйте позже.")
 

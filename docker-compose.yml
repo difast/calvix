@@ -28,7 +28,10 @@ services:
       db:
         condition: service_healthy
     volumes:
-      - ./bot.db:/app/bot.db  # для совместимости, но используется PostgreSQL
+      - ./bot.db:/app/bot.db
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     restart: unless-stopped
 
 volumes:

@@ -6,6 +6,7 @@ from bot.fsm.booking import BookingStates
 from bot.services.ai_client import AIClient
 from bot.services.sales_agent import SalesAgent
 from bot.services.analytics import analytics
+from bot.services.supabase_sync import supabase_sync
 from bot.repositories import LeadRepository, MessageRepository
 from bot.config import settings
 
@@ -56,6 +57,7 @@ def create_message_router() -> Router:
 
         business_id = kwargs.get("business_id", 1)
         prompt = kwargs.get("business_prompt", "You are a sales assistant. Be concise.")
+        business = kwargs.get("business")
 
         # Получаем или создаём лида
         lead_id = await lead_repo.get_or_create(business_id, user_id, username, full_name)
@@ -91,6 +93,8 @@ def create_message_router() -> Router:
             })
 
             lead = await lead_repo.get(lead_id)
+
+            # Уведомление админу
             for admin_id in settings.admin_ids:
                 try:
                     await message.bot.send_message(
@@ -103,6 +107,24 @@ def create_message_router() -> Router:
                     )
                 except Exception as e:
                     print(f"Ошибка уведомления: {e}")
+
+            # Синхронизация с Supabase
+            try:
+                await supabase_sync.push_hot_lead(
+                    business_id=business_id,
+                    business_name=business.name if business else "Неизвестно",
+                    telegram_id=user_id,
+                    username=username,
+                    full_name=full_name,
+                    phone=lead.phone or "",
+                    last_message=user_text,
+                    trigger_word=next(
+                        (kw for kw in HOT_KEYWORDS if kw in user_text.lower()), ""
+                    )
+                )
+            except Exception as e:
+                print(f"Supabase sync error: {e}")
+
             await message.answer(ai_response, reply_markup=get_book_button())
 
         elif qualification == "WARM":

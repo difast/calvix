@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     
     # Admin
     admin_ids: List[int] = Field(..., env="ADMIN_IDS")
+    supabase_url: str = Field(default="", env="SUPABASE_URL")
     
     # Follow-up
     followup_delay_seconds: int = Field(default=3600, env="FOLLOWUP_DELAY_SECONDS")
@@ -25,6 +26,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
+
 
 
 settings = Settings()

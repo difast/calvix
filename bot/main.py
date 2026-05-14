@@ -3,6 +3,7 @@ import logging
 from bot.config import settings
 from bot.services.multibot_manager import MultiBotManager
 from bot.handlers.admin import set_multibot_manager
+from bot.services.supabase_sync import supabase_sync
 
 logging.basicConfig(
     level=logging.INFO,
@@ -16,6 +17,12 @@ async def main():
     
     # Создаём менеджера
     manager = MultiBotManager()
+    # Инициализация Supabase таблиц
+    try:
+        await supabase_sync.ensure_tables()
+        logger.info("✅ Supabase таблицы готовы")
+    except Exception as e:
+        logger.warning(f"⚠️ Supabase недоступен: {e}")
     set_multibot_manager(manager)
     
     # Запускаем всех ботов
