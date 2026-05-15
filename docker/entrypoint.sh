@@ -15,11 +15,13 @@ async def main():
         return
     user, password, host, port, database = m.groups()
     database = database.split('?')[0]
+    port = int(port)
+    ssl_mode = 'require' if port == 6543 else False
     try:
         conn = await asyncpg.connect(
-            host=host, port=int(port), user=user,
+            host=host, port=port, user=user,
             password=password, database=database,
-            ssl='require', statement_cache_size=0
+            ssl=ssl_mode, statement_cache_size=0
         )
         tables = await conn.fetch(\"SELECT tablename FROM pg_tables WHERE schemaname='public'\")
         await conn.close()
