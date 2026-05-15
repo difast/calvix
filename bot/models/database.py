@@ -5,7 +5,11 @@ from bot.config import settings
 #Заменяем postgresql:// на postgresql+asyncpg://
 async_database_url = settings.database_url.replace("postgresql://", "postgresql+asyncpg://")
 
-engine = create_async_engine(async_database_url, echo=False)
+engine = create_async_engine(
+    async_database_url,
+    echo=False,
+    connect_args={"statement_cache_size": 0},
+)
 AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 Base = declarative_base()
 
