@@ -96,17 +96,32 @@ def validate_datetime(datetime_str: str) -> tuple[bool, str, datetime]:
     return False, datetime_str, None
 
 
-async def create_booking(lead_id: int, phone: str, scheduled_datetime: str, scheduled_dt: datetime):
+async def create_booking(lead_id: int, phone: str, scheduled_datetime: str, scheduled_dt: datetime, business_id: int = 1):
     from bot.repositories.lead_repo import LeadRepository
-    
+    from bot.models.database import AsyncSessionLocal
+    from bot.models.booking import Booking
+
     lead_repo = LeadRepository()
-    lead = await lead_repo.get(lead_id)
-    
-    if not lead:
-        return False, None
-    
-    await lead_repo.update_phone(lead_id, phone)
-    
+
+    if lead_id:
+        lead = await lead_repo.get(lead_id)
+        if lead:
+            await lead_repo.update_phone(lead_id, phone)
+
+    # Сохраняем в таблицу bookings
+    try:
+        async with AsyncSessionLocal() as session:
+            booking = Booking(
+                lead_id=lead_id,
+                business_id=business_id,
+                phone=phone,
+                status="pending",
+            )
+            session.add(booking)
+            await session.commit()
+    except Exception as e:
+        print(f"❌ Ошибка сохранения booking в БД: {e}")
+
     message = (
         f"✅ Отлично! Я записал вас на созвон.\n\n"
         f"📅 Дата и время: {scheduled_datetime}\n"
@@ -114,7 +129,7 @@ async def create_booking(lead_id: int, phone: str, scheduled_datetime: str, sche
         f"Свяжитесь с менеджером для подтверждения: @akovpyat\n\n"
         f"До встречи! 🚀"
     )
-    
+
     return True, message
 
 

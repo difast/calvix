@@ -1,10 +1,10 @@
-from openai import OpenAI
+from openai import AsyncOpenAI
 from bot.config import settings
 
 
 class AIClient:
     def __init__(self):
-        self.client = OpenAI(
+        self.client = AsyncOpenAI(
             api_key=settings.openai_api_key,
             base_url=settings.openai_base_url,
             timeout=60.0,
@@ -13,15 +13,15 @@ class AIClient:
         self.model = settings.ai_model
         self.max_tokens = settings.max_tokens
         self.temperature = settings.ai_temperature
-    
+
     async def generate_response(self, messages: list, system_prompt: str) -> str:
         full_messages = [
             {"role": "system", "content": system_prompt},
             *messages
         ]
-        
+
         try:
-            response = self.client.chat.completions.create(
+            response = await self.client.chat.completions.create(
                 model=self.model,
                 messages=full_messages,
                 max_tokens=self.max_tokens,
