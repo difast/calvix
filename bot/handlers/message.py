@@ -56,26 +56,35 @@ def create_message_router() -> Router:
         user_text = message.text
 
         business_id = kwargs.get("business_id", 1)
-        prompt = kwargs.get("business_prompt", "You are a sales assistant. Be concise.")
+        prompt = kwargs.get("business_prompt", "Ты ассистент по продажам. Отвечай по-русски.")
         business = kwargs.get("business")
 
-        # Получаем или создаём лида
-        lead_id = await lead_repo.get_or_create(business_id, user_id, username, full_name)
-
-        # Получаем историю
-        history = await msg_repo.get_conversation_history(lead_id, business_id)
+        try:
+            lead_id = await lead_repo.get_or_create(business_id, user_id, username, full_name)
+            history = await msg_repo.get_conversation_history(lead_id, business_id)
+        except Exception as e:
+            print(f"❌ Ошибка БД (lead/history): {e}")
+            lead_id = None
+            history = []
 
         # Получаем ответ от AI
         ai_response = await sales_agent.get_response(user_text, history, prompt)
 
         # Сохраняем сообщения
-        await msg_repo.save_message(lead_id, business_id, "user", user_text)
-        await msg_repo.save_message(lead_id, business_id, "assistant", ai_response)
+        if lead_id:
+            try:
+                await msg_repo.save_message(lead_id, business_id, "user", user_text)
+                await msg_repo.save_message(lead_id, business_id, "assistant", ai_response)
+            except Exception as e:
+                print(f"❌ Ошибка сохранения сообщений: {e}")
 
         # Трекинг сообщения
-        await analytics.track("message_sent", business_id, lead_id, {
-            "text": user_text[:100]
-        })
+        try:
+            await analytics.track("message_sent", business_id, lead_id, {
+                "text": user_text[:100]
+            })
+        except Exception:
+            pass
 
         # Сохраняем для FSM записи на созвон
         await state.update_data(lead_id=lead_id, business_id=business_id)
