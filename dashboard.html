@@ -1,0 +1,718 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AI Sales Bot · Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+  :root {
+    --bg:        #0f0f0f;
+    --bg-elev:   #1c1c1c;
+    --bg-card:   #171717;
+    --bg-hover:  #242424;
+    --line:      #2a2a2a;
+    --line-str:  #333;
+    --ink:       #ededed;
+    --ink-2:     #b0b0b0;
+    --ink-3:     #717171;
+    --ink-4:     #444;
+    --green:     #3ecf8e;
+    --green-dim: rgba(62,207,142,.12);
+    --green-bd:  rgba(62,207,142,.25);
+    --hot:       #f97316;
+    --hot-dim:   rgba(249,115,22,.12);
+    --hot-bd:    rgba(249,115,22,.25);
+    --book:      #6366f1;
+    --book-dim:  rgba(99,102,241,.12);
+    --book-bd:   rgba(99,102,241,.25);
+    --radius:    10px;
+    --radius-sm: 6px;
+    --shadow:    0 1px 0 rgba(255,255,255,.04), 0 4px 16px rgba(0,0,0,.4);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Geist", ui-sans-serif, system-ui, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    letter-spacing: -0.005em;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono { font-family: "Geist Mono", ui-monospace, monospace; font-feature-settings: "tnum" 1; }
+
+  /* ── Layout ── */
+  .shell { min-height: 100vh; display: flex; flex-direction: column; }
+
+  /* ── Header ── */
+  .header {
+    border-bottom: 1px solid var(--line);
+    background: var(--bg-card);
+    padding: 0 32px;
+    height: 58px;
+    display: flex;
+    align-items: center;
+    position: sticky; top: 0; z-index: 10;
+    backdrop-filter: blur(12px) saturate(150%);
+  }
+  .header-inner {
+    max-width: 1400px; width: 100%; margin: 0 auto;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .logo-wrap {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .logo-badge {
+    width: 32px; height: 32px;
+    background: var(--green);
+    border-radius: 8px;
+    display: grid; place-items: center;
+  }
+  .logo-name { font-size: 15px; font-weight: 600; letter-spacing: -0.02em; }
+  .logo-name span { color: var(--green); }
+  .header-right {
+    position: absolute; right: 0;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .live-dot {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11.5px; color: var(--ink-3);
+  }
+  .live-dot i {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--green);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+  /* ── Controls bar ── */
+  .controls {
+    border-bottom: 1px solid var(--line);
+    background: var(--bg-card);
+    padding: 10px 32px;
+  }
+  .controls-inner {
+    max-width: 1400px; width: 100%; margin: 0 auto;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .ctrl-label { font-size: 11.5px; color: var(--ink-3); }
+  select.sel {
+    appearance: none;
+    background: var(--bg-elev);
+    border: 1px solid var(--line-str);
+    border-radius: var(--radius-sm);
+    color: var(--ink);
+    font: inherit; font-size: 12.5px;
+    padding: 5px 30px 5px 10px;
+    cursor: pointer;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='rgba(255,255,255,.35)' d='M0 0h10L5 6z'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    min-width: 180px;
+    outline: none;
+  }
+  select.sel:focus { border-color: var(--green); }
+  .seg {
+    display: inline-flex;
+    background: var(--bg-elev);
+    border: 1px solid var(--line-str);
+    border-radius: var(--radius-sm);
+    padding: 2px;
+    gap: 2px;
+  }
+  .seg button {
+    background: transparent; border: 0;
+    color: var(--ink-3); font: inherit; font-size: 12px; font-weight: 500;
+    padding: 4px 12px; border-radius: 4px; cursor: pointer;
+    transition: background .12s, color .12s;
+  }
+  .seg button.on {
+    background: var(--green); color: #0f0f0f; font-weight: 600;
+  }
+  .ctrl-spacer { flex: 1; }
+  .refresh-btn {
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 12px; border-radius: var(--radius-sm);
+    background: var(--bg-elev); border: 1px solid var(--line-str);
+    color: var(--ink-2); font: inherit; font-size: 12.5px; cursor: pointer;
+    transition: border-color .12s, color .12s;
+  }
+  .refresh-btn:hover { border-color: var(--green); color: var(--green); }
+
+  /* ── Page body ── */
+  .page { max-width: 1400px; margin: 0 auto; padding: 24px 32px 48px; }
+
+  /* ── KPI row ── */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  @media (max-width: 900px) { .kpi-grid { grid-template-columns: repeat(2,1fr); } }
+
+  .kpi-card {
+    background: var(--bg-card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 18px 20px 20px;
+    box-shadow: var(--shadow);
+    position: relative;
+    overflow: hidden;
+  }
+  .kpi-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: var(--accent-color, var(--green));
+    opacity: .7;
+  }
+  .kpi-label {
+    font-size: 11px; text-transform: uppercase;
+    letter-spacing: .07em; color: var(--ink-3); font-weight: 500;
+    margin-bottom: 12px;
+  }
+  .kpi-value {
+    font-size: 36px; font-weight: 500;
+    letter-spacing: -0.04em; line-height: 1;
+    color: var(--ink);
+  }
+  .kpi-value .kpi-unit { font-size: 14px; color: var(--ink-3); margin-left: 4px; }
+  .kpi-icon {
+    position: absolute; right: 16px; top: 16px;
+    width: 32px; height: 32px; border-radius: 8px;
+    display: grid; place-items: center;
+    background: var(--icon-bg, var(--green-dim));
+    font-size: 15px;
+  }
+
+  /* ── Section ── */
+  .section { margin-bottom: 20px; }
+  .section-hd {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 10px;
+  }
+  .section-title {
+    font-size: 14px; font-weight: 600; letter-spacing: -0.01em;
+  }
+  .badge {
+    display: inline-flex; align-items: center;
+    padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 500;
+  }
+  .badge-hot { color: var(--hot); background: var(--hot-dim); border: 1px solid var(--hot-bd); }
+  .badge-book { color: var(--book); background: var(--book-dim); border: 1px solid var(--book-bd); }
+  .badge-green { color: var(--green); background: var(--green-dim); border: 1px solid var(--green-bd); }
+
+  /* ── Table ── */
+  .table-wrap {
+    background: var(--bg-card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .table-scroll { overflow-x: auto; }
+  table {
+    width: 100%; border-collapse: collapse; font-size: 12.5px;
+  }
+  thead th {
+    text-align: left;
+    font-size: 10.5px; text-transform: uppercase;
+    letter-spacing: .06em; color: var(--ink-4); font-weight: 500;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--line);
+    background: var(--bg-elev);
+    white-space: nowrap;
+  }
+  tbody td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line);
+    color: var(--ink-2);
+    vertical-align: middle;
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+  tbody tr:hover td { background: var(--bg-hover); }
+  .td-primary { color: var(--ink); font-weight: 500; }
+  .td-phone { font-family: "Geist Mono", monospace; color: var(--ink-3); font-size: 12px; }
+  .td-nick { color: var(--green); font-family: "Geist Mono", monospace; font-size: 12px; }
+  .td-msg {
+    max-width: 260px; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; color: var(--ink-3);
+  }
+  .trigger-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 5px; font-size: 11px; font-weight: 500;
+    background: var(--hot-dim); color: var(--hot); border: 1px solid var(--hot-bd);
+    white-space: nowrap;
+  }
+  .biz-chip {
+    display: inline-flex; align-items: center;
+    padding: 2px 8px; border-radius: 5px; font-size: 11px; font-weight: 500;
+    background: var(--bg-hover); color: var(--ink-2); border: 1px solid var(--line-str);
+    white-space: nowrap;
+  }
+  .td-time {
+    font-family: "Geist Mono", monospace; font-size: 12px;
+    color: var(--book); font-weight: 500;
+  }
+  .td-date { font-family: "Geist Mono", monospace; font-size: 11.5px; color: var(--ink-3); }
+
+  .empty-row td {
+    text-align: center; padding: 40px; color: var(--ink-4);
+    font-size: 13px;
+  }
+
+  /* ── Spinner ── */
+  .spinner {
+    display: flex; align-items: center; justify-content: center;
+    padding: 48px; color: var(--ink-4); gap: 10px; font-size: 13px;
+  }
+  .spin {
+    width: 18px; height: 18px; border: 2px solid var(--line-str);
+    border-top-color: var(--green); border-radius: 50%;
+    animation: spin .7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Error banner ── */
+  .error-banner {
+    background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.3);
+    border-radius: var(--radius-sm);
+    padding: 10px 14px; color: #f87171; font-size: 12.5px;
+    margin-bottom: 16px;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  /* ── Config modal ── */
+  .cfg-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.7);
+    display: flex; align-items: center; justify-content: center; z-index: 100;
+    backdrop-filter: blur(4px);
+  }
+  .cfg-box {
+    background: var(--bg-elev); border: 1px solid var(--line-str);
+    border-radius: 14px; padding: 28px; width: 480px; max-width: 95vw;
+    box-shadow: 0 24px 64px rgba(0,0,0,.7);
+  }
+  .cfg-title { font-size: 16px; font-weight: 600; letter-spacing: -0.02em; margin-bottom: 6px; }
+  .cfg-sub { color: var(--ink-3); font-size: 12.5px; margin-bottom: 20px; }
+  .cfg-field { margin-bottom: 14px; }
+  .cfg-field label { display: block; font-size: 11.5px; color: var(--ink-3); margin-bottom: 5px; font-weight: 500; }
+  .cfg-field input {
+    width: 100%; background: var(--bg-card); border: 1px solid var(--line-str);
+    border-radius: var(--radius-sm); color: var(--ink); font: inherit; font-size: 13px;
+    padding: 8px 12px; outline: none;
+  }
+  .cfg-field input:focus { border-color: var(--green); }
+  .cfg-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+  .btn-primary {
+    padding: 7px 18px; border-radius: var(--radius-sm);
+    background: var(--green); color: #0f0f0f; font: inherit; font-size: 13px;
+    font-weight: 600; border: 0; cursor: pointer;
+  }
+  .btn-ghost {
+    padding: 7px 14px; border-radius: var(--radius-sm);
+    background: transparent; color: var(--ink-3); font: inherit; font-size: 13px;
+    border: 1px solid var(--line-str); cursor: pointer;
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+
+const { createClient } = supabase;
+
+// ── Config ──────────────────────────────────────────────────────────────────
+const CONFIG_KEY = 'ai_sales_bot_cfg';
+
+function loadCfg() {
+  try { return JSON.parse(localStorage.getItem(CONFIG_KEY)) || {}; }
+  catch { return {}; }
+}
+function saveCfg(cfg) {
+  localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
+}
+
+// ── Icons ────────────────────────────────────────────────────────────────────
+const IconFire = () => (
+  <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 2c0 0-5 5-5 10a5 5 0 0010 0c0-3-2-5-2-5s0 3-3 3c0-4 0-8 0-8z"/>
+  </svg>
+);
+const IconCalendar = () => (
+  <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/>
+    <line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/>
+  </svg>
+);
+const IconRefresh = () => (
+  <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0115-6.7L21 8"/>
+    <path d="M3 22v-6h6"/><path d="M21 12a9 9 0 01-15 6.7L3 16"/>
+  </svg>
+);
+const IconSettings = () => (
+  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="3"/>
+    <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+  </svg>
+);
+
+// ── Supabase Logo SVG ────────────────────────────────────────────────────────
+const SupabaseLogo = () => (
+  <svg width="22" height="22" viewBox="0 0 109 113" fill="none">
+    <path d="M63.7 110.3c-2.6 3.3-8 1.5-8-2.6V62.5H99c6.8 0 10.5 7.9 6.2 13.1l-41.5 34.7z" fill="url(#sb-a)"/>
+    <path d="M63.7 110.3c-2.6 3.3-8 1.5-8-2.6V62.5H99c6.8 0 10.5 7.9 6.2 13.1l-41.5 34.7z" fill="url(#sb-b)" fillOpacity=".2"/>
+    <path d="M45.3 2.5c2.6-3.3 8-1.5 8 2.6v45.2H10c-6.8 0-10.5-7.9-6.2-13.1L45.3 2.5z" fill="#3ECF8E"/>
+    <defs>
+      <linearGradient id="sb-a" x1="53.7" y1="74.9" x2="94.1" y2="99.5" gradientUnits="userSpaceOnUse">
+        <stop stopColor="#249361"/>
+        <stop offset="1" stopColor="#3ECF8E"/>
+      </linearGradient>
+      <linearGradient id="sb-b" x1="36.2" y1="60.8" x2="61.2" y2="79.4" gradientUnits="userSpaceOnUse">
+        <stop/>
+        <stop offset="1" stopOpacity="0"/>
+      </linearGradient>
+    </defs>
+  </svg>
+);
+
+// ── Date helpers ──────────────────────────────────────────────────────────────
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+function weekAgoISO() {
+  const d = new Date(); d.setDate(d.getDate() - 7);
+  return d.toISOString().slice(0, 10);
+}
+function monthAgoISO() {
+  const d = new Date(); d.setDate(d.getDate() - 30);
+  return d.toISOString().slice(0, 10);
+}
+function fmtDate(str) {
+  if (!str) return '—';
+  try { return new Date(str).toLocaleDateString('ru-RU', { day:'2-digit', month:'2-digit', year:'2-digit' }); }
+  catch { return str; }
+}
+function fmtDateTime(str) {
+  if (!str) return '—';
+  try { return new Date(str).toLocaleString('ru-RU', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }); }
+  catch { return str; }
+}
+
+// ── Config Modal ──────────────────────────────────────────────────────────────
+function ConfigModal({ cfg, onSave, onClose }) {
+  const [url, setUrl] = React.useState(cfg.url || '');
+  const [key, setKey] = React.useState(cfg.key || '');
+  return (
+    <div className="cfg-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="cfg-box">
+        <div className="cfg-title">Настройка Supabase</div>
+        <div className="cfg-sub">Введите данные проекта — Project URL и anon key из Settings → API</div>
+        <div className="cfg-field">
+          <label>Project URL</label>
+          <input
+            value={url}
+            onChange={e => setUrl(e.target.value)}
+            placeholder="https://xxxx.supabase.co"
+          />
+        </div>
+        <div className="cfg-field">
+          <label>Anon Key</label>
+          <input
+            value={key}
+            onChange={e => setKey(e.target.value)}
+            placeholder="eyJhbGciOiJI..."
+            type="password"
+          />
+        </div>
+        <div className="cfg-actions">
+          <button className="btn-ghost" onClick={onClose}>Отмена</button>
+          <button className="btn-primary" onClick={() => onSave({ url, key })}>Сохранить</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── KPI Card ──────────────────────────────────────────────────────────────────
+function KpiCard({ label, value, icon, accentColor, iconBg }) {
+  return (
+    <div className="kpi-card" style={{ '--accent-color': accentColor, '--icon-bg': iconBg }}>
+      <div className="kpi-label">{label}</div>
+      <div className="kpi-value">{value ?? <span style={{color:'var(--ink-4)'}}>—</span>}</div>
+      <div className="kpi-icon">{icon}</div>
+    </div>
+  );
+}
+
+// ── Main App ──────────────────────────────────────────────────────────────────
+function App() {
+  const [cfg, setCfg] = React.useState(loadCfg);
+  const [showCfg, setShowCfg] = React.useState(!cfg.url || !cfg.key);
+
+  const [hotLeads, setHotLeads]   = React.useState([]);
+  const [bookings, setBookings]   = React.useState([]);
+  const [loading, setLoading]     = React.useState(false);
+  const [error, setError]         = React.useState(null);
+  const [lastRefresh, setLastRefresh] = React.useState(null);
+
+  const [datePeriod, setDatePeriod] = React.useState('week');
+  const [bizFilter, setBizFilter]   = React.useState('all');
+
+  const client = React.useMemo(() => {
+    if (cfg.url && cfg.key) return createClient(cfg.url, cfg.key);
+    return null;
+  }, [cfg.url, cfg.key]);
+
+  const fetchData = React.useCallback(async () => {
+    if (!client) return;
+    setLoading(true); setError(null);
+    try {
+      let dateFrom = null;
+      if (datePeriod === 'today') dateFrom = todayISO();
+      else if (datePeriod === 'week')  dateFrom = weekAgoISO();
+      else if (datePeriod === 'month') dateFrom = monthAgoISO();
+
+      let hotQ = client.from('hot_leads').select('*').order('date', { ascending: false });
+      if (dateFrom) hotQ = hotQ.gte('date', dateFrom);
+      if (bizFilter !== 'all') hotQ = hotQ.eq('business_name', bizFilter);
+
+      let bookQ = client.from('bookings').select('*').order('booking_date', { ascending: false });
+      if (dateFrom) bookQ = bookQ.gte('booking_date', dateFrom);
+      if (bizFilter !== 'all') bookQ = bookQ.eq('business_name', bizFilter);
+
+      const [{ data: hl, error: he }, { data: bk, error: be }] = await Promise.all([hotQ, bookQ]);
+      if (he) throw he;
+      if (be) throw be;
+      setHotLeads(hl || []);
+      setBookings(bk || []);
+      setLastRefresh(new Date());
+    } catch (e) {
+      setError(e.message || 'Ошибка загрузки данных');
+    } finally {
+      setLoading(false);
+    }
+  }, [client, datePeriod, bizFilter]);
+
+  React.useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Unfiltered counts for KPI (total and today)
+  const [totals, setTotals] = React.useState({ hot: null, book: null, hotToday: null, bookToday: null });
+  React.useEffect(() => {
+    if (!client) return;
+    (async () => {
+      const today = todayISO();
+      const [
+        { count: hot },
+        { count: book },
+        { count: hotToday },
+        { count: bookToday }
+      ] = await Promise.all([
+        client.from('hot_leads').select('*', { count: 'exact', head: true }),
+        client.from('bookings').select('*', { count: 'exact', head: true }),
+        client.from('hot_leads').select('*', { count: 'exact', head: true }).gte('date', today),
+        client.from('bookings').select('*', { count: 'exact', head: true }).gte('booking_date', today),
+      ]);
+      setTotals({ hot, book, hotToday, bookToday });
+    })();
+  }, [client]);
+
+  // Business list for filter
+  const businesses = React.useMemo(() => {
+    const all = [...hotLeads, ...bookings].map(r => r.business_name).filter(Boolean);
+    return [...new Set(all)].sort();
+  }, [hotLeads, bookings]);
+
+  function handleSaveCfg(newCfg) {
+    saveCfg(newCfg); setCfg(newCfg); setShowCfg(false);
+  }
+
+  return (
+    <div className="shell">
+      {showCfg && <ConfigModal cfg={cfg} onSave={handleSaveCfg} onClose={() => setShowCfg(false)} />}
+
+      {/* Header */}
+      <header className="header">
+        <div className="header-inner">
+          <div className="logo-wrap">
+            <div className="logo-badge"><SupabaseLogo /></div>
+            <div>
+              <div className="logo-name">AI <span>Sales</span> Bot</div>
+            </div>
+          </div>
+          <div className="header-right">
+            <div className="live-dot">
+              <i />{lastRefresh ? lastRefresh.toLocaleTimeString('ru-RU', {hour:'2-digit',minute:'2-digit'}) : 'ожидание'}
+            </div>
+            <button className="refresh-btn" onClick={fetchData} title="Обновить">
+              <IconRefresh /> Обновить
+            </button>
+            <button className="refresh-btn" onClick={() => setShowCfg(true)} title="Настройки">
+              <IconSettings /> Supabase
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Controls */}
+      <div className="controls">
+        <div className="controls-inner">
+          <span className="ctrl-label">Бизнес:</span>
+          <select className="sel" value={bizFilter} onChange={e => setBizFilter(e.target.value)}>
+            <option value="all">Все бизнесы</option>
+            {businesses.map(b => <option key={b} value={b}>{b}</option>)}
+          </select>
+          <span className="ctrl-label" style={{marginLeft:8}}>Период:</span>
+          <div className="seg">
+            {[['today','Сегодня'],['week','Неделя'],['month','Месяц'],['all','Всё время']].map(([v,l]) => (
+              <button key={v} className={datePeriod===v?'on':''} onClick={() => setDatePeriod(v)}>{l}</button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Page */}
+      <div className="page">
+        {error && <div className="error-banner">⚠ {error}</div>}
+
+        {/* KPI */}
+        <div className="kpi-grid">
+          <KpiCard
+            label="Всего HOT лидов"
+            value={totals.hot}
+            accentColor="var(--hot)"
+            iconBg="var(--hot-dim)"
+            icon={<span style={{fontSize:16}}>🔥</span>}
+          />
+          <KpiCard
+            label="Всего записей на созвон"
+            value={totals.book}
+            accentColor="var(--book)"
+            iconBg="var(--book-dim)"
+            icon={<span style={{fontSize:16}}>📅</span>}
+          />
+          <KpiCard
+            label="HOT лидов сегодня"
+            value={totals.hotToday}
+            accentColor="var(--green)"
+            iconBg="var(--green-dim)"
+            icon={<span style={{fontSize:16}}>⚡</span>}
+          />
+          <KpiCard
+            label="Записей сегодня"
+            value={totals.bookToday}
+            accentColor="#a78bfa"
+            iconBg="rgba(167,139,250,.12)"
+            icon={<span style={{fontSize:16}}>✅</span>}
+          />
+        </div>
+
+        {/* HOT Leads */}
+        <div className="section">
+          <div className="section-hd">
+            <div className="section-title">🔥 HOT Лиды</div>
+            <span className="badge badge-hot">{hotLeads.length} записей</span>
+          </div>
+          <div className="table-wrap">
+            {loading ? (
+              <div className="spinner"><div className="spin"/> Загрузка...</div>
+            ) : (
+              <div className="table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Бизнес</th>
+                      <th>Имя</th>
+                      <th>Никнейм</th>
+                      <th>Телефон</th>
+                      <th>Триггер</th>
+                      <th>Последнее сообщение</th>
+                      <th>Дата</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {hotLeads.length === 0 ? (
+                      <tr className="empty-row"><td colSpan="7">Нет данных за выбранный период</td></tr>
+                    ) : hotLeads.map((r, i) => (
+                      <tr key={i}>
+                        <td><span className="biz-chip">{r.business_name || '—'}</span></td>
+                        <td className="td-primary">{r.client_name || r.name || '—'}</td>
+                        <td className="td-nick">{r.username ? `@${r.username}` : '—'}</td>
+                        <td className="td-phone">{r.phone || '—'}</td>
+                        <td>
+                          {r.trigger_word
+                            ? <span className="trigger-chip">🎯 {r.trigger_word}</span>
+                            : <span style={{color:'var(--ink-4)'}}>—</span>}
+                        </td>
+                        <td className="td-msg" title={r.last_message || r.message || ''}>
+                          {r.last_message || r.message || '—'}
+                        </td>
+                        <td className="td-date">{fmtDate(r.date || r.created_at)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Bookings */}
+        <div className="section">
+          <div className="section-hd">
+            <div className="section-title">📅 Записи на созвон</div>
+            <span className="badge badge-book">{bookings.length} записей</span>
+          </div>
+          <div className="table-wrap">
+            {loading ? (
+              <div className="spinner"><div className="spin"/> Загрузка...</div>
+            ) : (
+              <div className="table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Бизнес</th>
+                      <th>Имя</th>
+                      <th>Никнейм</th>
+                      <th>Телефон</th>
+                      <th>Время созвона</th>
+                      <th>Дата записи</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bookings.length === 0 ? (
+                      <tr className="empty-row"><td colSpan="6">Нет данных за выбранный период</td></tr>
+                    ) : bookings.map((r, i) => (
+                      <tr key={i}>
+                        <td><span className="biz-chip">{r.business_name || '—'}</span></td>
+                        <td className="td-primary">{r.client_name || r.name || '—'}</td>
+                        <td className="td-nick">{r.username ? `@${r.username}` : '—'}</td>
+                        <td className="td-phone">{r.phone || '—'}</td>
+                        <td className="td-time">{fmtDateTime(r.call_datetime || r.call_time)}</td>
+                        <td className="td-date">{fmtDate(r.booking_date || r.created_at)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
