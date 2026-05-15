@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>AI Sales Bot · Dashboard</title>
+<title>Calvix AI · Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -13,204 +13,201 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
   :root {
-    --bg:        #0f0f0f;
-    --bg-elev:   #1c1c1c;
-    --bg-card:   #171717;
-    --bg-hover:  #242424;
-    --line:      #2a2a2a;
-    --line-str:  #333;
-    --ink:       #ededed;
-    --ink-2:     #b0b0b0;
-    --ink-3:     #717171;
-    --ink-4:     #444;
-    --green:     #3ecf8e;
-    --green-dim: rgba(62,207,142,.12);
-    --green-bd:  rgba(62,207,142,.25);
-    --hot:       #f97316;
-    --hot-dim:   rgba(249,115,22,.12);
-    --hot-bd:    rgba(249,115,22,.25);
-    --book:      #6366f1;
-    --book-dim:  rgba(99,102,241,.12);
-    --book-bd:   rgba(99,102,241,.25);
-    --radius:    10px;
-    --radius-sm: 6px;
-    --shadow:    0 1px 0 rgba(255,255,255,.04), 0 4px 16px rgba(0,0,0,.4);
+    --bg:         #ffffff;
+    --bg-page:    #f4f6f5;
+    --bg-dg:      #0d2b1f;
+    --bg-dg2:     #12382a;
+    --bg-card:    #ffffff;
+    --bg-hover:   #f0f7f4;
+    --line:       #e2ece7;
+    --line-dg:    rgba(255,255,255,.1);
+    --ink:        #0d2b1f;
+    --ink-2:      #2d5244;
+    --ink-3:      #6b9080;
+    --ink-4:      #a8c4b8;
+    --ink-inv:    #ffffff;
+    --ink-inv2:   rgba(255,255,255,.7);
+    --ink-inv3:   rgba(255,255,255,.4);
+
+    /* accent palette */
+    --c1: #16a34a;   --c1d: rgba(22,163,74,.12);   --c1b: rgba(22,163,74,.25);
+    --c2: #6366f1;   --c2d: rgba(99,102,241,.12);  --c2b: rgba(99,102,241,.25);
+    --c3: #f97316;   --c3d: rgba(249,115,22,.12);  --c3b: rgba(249,115,22,.25);
+    --c4: #0ea5e9;   --c4d: rgba(14,165,233,.12);  --c4b: rgba(14,165,233,.25);
+    --c5: #ec4899;   --c5d: rgba(236,72,153,.12);  --c5b: rgba(236,72,153,.25);
+
+    --radius:    12px;
+    --radius-sm: 7px;
+    --shadow:    0 1px 3px rgba(13,43,31,.06), 0 4px 16px rgba(13,43,31,.06);
+    --shadow-dg: 0 4px 24px rgba(0,0,0,.35);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
-    background: var(--bg);
+    background: var(--bg-page);
     color: var(--ink);
     font-family: "Geist", ui-sans-serif, system-ui, sans-serif;
-    font-size: 13px;
-    line-height: 1.5;
-    letter-spacing: -0.005em;
+    font-size: 13px; line-height: 1.5; letter-spacing: -0.005em;
     -webkit-font-smoothing: antialiased;
   }
   .mono { font-family: "Geist Mono", ui-monospace, monospace; font-feature-settings: "tnum" 1; }
 
-  /* ── Layout ── */
+  /* ── Shell ── */
   .shell { min-height: 100vh; display: flex; flex-direction: column; }
 
   /* ── Header ── */
   .header {
-    border-bottom: 1px solid var(--line);
-    background: var(--bg-card);
+    background: var(--bg-dg);
     padding: 0 32px;
-    height: 58px;
-    display: flex;
-    align-items: center;
+    height: 60px;
+    display: flex; align-items: center;
     position: sticky; top: 0; z-index: 10;
-    backdrop-filter: blur(12px) saturate(150%);
+    box-shadow: var(--shadow-dg);
   }
   .header-inner {
-    max-width: 1400px; width: 100%; margin: 0 auto;
+    max-width: 1440px; width: 100%; margin: 0 auto;
     display: flex; align-items: center; justify-content: center;
     position: relative;
   }
-  .logo-wrap {
-    display: flex; align-items: center; gap: 10px;
-  }
-  .logo-badge {
-    width: 32px; height: 32px;
-    background: var(--green);
-    border-radius: 8px;
+  .logo-wrap { display: flex; align-items: center; gap: 10px; }
+  .logo-mark {
+    width: 34px; height: 34px; border-radius: 9px;
+    background: linear-gradient(135deg, #1db954, #0d7a38);
     display: grid; place-items: center;
+    font-weight: 700; font-size: 15px; color: #fff; letter-spacing: -0.02em;
+    box-shadow: 0 2px 8px rgba(29,185,84,.4);
   }
-  .logo-name { font-size: 15px; font-weight: 600; letter-spacing: -0.02em; }
-  .logo-name span { color: var(--green); }
+  .logo-text { font-size: 16px; font-weight: 700; letter-spacing: -0.03em; color: #fff; }
+  .logo-text span { color: #4ade80; }
+  .logo-sub { font-size: 10.5px; color: var(--ink-inv3); margin-top: 1px; }
+
+  .header-left { position: absolute; left: 0; }
   .header-right {
     position: absolute; right: 0;
     display: flex; align-items: center; gap: 8px;
   }
-  .live-dot {
+  .live-badge {
     display: flex; align-items: center; gap: 6px;
-    font-size: 11.5px; color: var(--ink-3);
+    font-size: 11.5px; color: var(--ink-inv3);
   }
-  .live-dot i {
+  .live-dot {
     width: 7px; height: 7px; border-radius: 50%;
-    background: var(--green);
-    animation: pulse 2s infinite;
+    background: #4ade80; animation: pulse 2s infinite;
   }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+  .hdr-btn {
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 12px; border-radius: var(--radius-sm);
+    background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.15);
+    color: var(--ink-inv2); font: inherit; font-size: 12px; cursor: pointer;
+    transition: background .15s, color .15s;
+  }
+  .hdr-btn:hover { background: rgba(255,255,255,.18); color: #fff; }
 
-  /* ── Controls bar ── */
+  /* ── Controls ── */
   .controls {
-    border-bottom: 1px solid var(--line);
-    background: var(--bg-card);
+    background: var(--bg-dg2);
     padding: 10px 32px;
+    border-bottom: 1px solid rgba(255,255,255,.06);
   }
   .controls-inner {
-    max-width: 1400px; width: 100%; margin: 0 auto;
+    max-width: 1440px; width: 100%; margin: 0 auto;
     display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   }
-  .ctrl-label { font-size: 11.5px; color: var(--ink-3); }
+  .ctrl-label { font-size: 11.5px; color: var(--ink-inv3); }
   select.sel {
     appearance: none;
-    background: var(--bg-elev);
-    border: 1px solid var(--line-str);
+    background: rgba(255,255,255,.08);
+    border: 1px solid rgba(255,255,255,.12);
     border-radius: var(--radius-sm);
-    color: var(--ink);
-    font: inherit; font-size: 12.5px;
-    padding: 5px 30px 5px 10px;
-    cursor: pointer;
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='rgba(255,255,255,.35)' d='M0 0h10L5 6z'/></svg>");
-    background-repeat: no-repeat;
-    background-position: right 8px center;
-    min-width: 180px;
-    outline: none;
+    color: #fff; font: inherit; font-size: 12.5px;
+    padding: 6px 30px 6px 10px; cursor: pointer; outline: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='rgba(255,255,255,.4)' d='M0 0h10L5 6z'/></svg>");
+    background-repeat: no-repeat; background-position: right 8px center;
+    min-width: 190px;
   }
-  select.sel:focus { border-color: var(--green); }
+  select.sel:focus { border-color: #4ade80; }
+  select.sel option { background: #0d2b1f; color: #fff; }
   .seg {
     display: inline-flex;
-    background: var(--bg-elev);
-    border: 1px solid var(--line-str);
+    background: rgba(255,255,255,.07);
+    border: 1px solid rgba(255,255,255,.1);
     border-radius: var(--radius-sm);
-    padding: 2px;
-    gap: 2px;
+    padding: 2px; gap: 2px;
   }
   .seg button {
     background: transparent; border: 0;
-    color: var(--ink-3); font: inherit; font-size: 12px; font-weight: 500;
-    padding: 4px 12px; border-radius: 4px; cursor: pointer;
+    color: var(--ink-inv3); font: inherit; font-size: 12px; font-weight: 500;
+    padding: 4px 13px; border-radius: 5px; cursor: pointer;
     transition: background .12s, color .12s;
   }
-  .seg button.on {
-    background: var(--green); color: #0f0f0f; font-weight: 600;
-  }
+  .seg button.on { background: #16a34a; color: #fff; font-weight: 600; }
   .ctrl-spacer { flex: 1; }
   .refresh-btn {
     display: flex; align-items: center; gap: 6px;
-    padding: 5px 12px; border-radius: var(--radius-sm);
-    background: var(--bg-elev); border: 1px solid var(--line-str);
-    color: var(--ink-2); font: inherit; font-size: 12.5px; cursor: pointer;
+    padding: 6px 13px; border-radius: var(--radius-sm);
+    background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12);
+    color: var(--ink-inv2); font: inherit; font-size: 12px; cursor: pointer;
     transition: border-color .12s, color .12s;
   }
-  .refresh-btn:hover { border-color: var(--green); color: var(--green); }
+  .refresh-btn:hover { border-color: #4ade80; color: #4ade80; }
 
-  /* ── Page body ── */
-  .page { max-width: 1400px; margin: 0 auto; padding: 24px 32px 48px; }
+  /* ── Page ── */
+  .page { max-width: 1440px; margin: 0 auto; padding: 24px 32px 48px; }
 
-  /* ── KPI row ── */
+  /* ── KPI grid ── */
   .kpi-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 12px;
-    margin-bottom: 20px;
+    gap: 14px; margin-bottom: 24px;
   }
-  @media (max-width: 900px) { .kpi-grid { grid-template-columns: repeat(2,1fr); } }
+  @media (max-width: 960px) { .kpi-grid { grid-template-columns: repeat(2,1fr); } }
 
   .kpi-card {
     background: var(--bg-card);
     border: 1px solid var(--line);
     border-radius: var(--radius);
-    padding: 18px 20px 20px;
+    padding: 20px 20px 22px;
     box-shadow: var(--shadow);
-    position: relative;
-    overflow: hidden;
+    position: relative; overflow: hidden;
   }
-  .kpi-card::before {
+  .kpi-card::after {
     content: '';
-    position: absolute; top: 0; left: 0; right: 0; height: 2px;
-    background: var(--accent-color, var(--green));
-    opacity: .7;
+    position: absolute; inset: 0;
+    border-radius: var(--radius);
+    border-top: 3px solid var(--kpi-color);
+    pointer-events: none;
+  }
+  .kpi-icon-wrap {
+    width: 38px; height: 38px; border-radius: 10px;
+    background: var(--kpi-bg);
+    display: grid; place-items: center;
+    font-size: 18px; margin-bottom: 14px;
   }
   .kpi-label {
     font-size: 11px; text-transform: uppercase;
     letter-spacing: .07em; color: var(--ink-3); font-weight: 500;
-    margin-bottom: 12px;
+    margin-bottom: 6px;
   }
   .kpi-value {
-    font-size: 36px; font-weight: 500;
-    letter-spacing: -0.04em; line-height: 1;
+    font-size: 38px; font-weight: 600;
+    letter-spacing: -0.045em; line-height: 1;
     color: var(--ink);
   }
-  .kpi-value .kpi-unit { font-size: 14px; color: var(--ink-3); margin-left: 4px; }
-  .kpi-icon {
-    position: absolute; right: 16px; top: 16px;
-    width: 32px; height: 32px; border-radius: 8px;
-    display: grid; place-items: center;
-    background: var(--icon-bg, var(--green-dim));
-    font-size: 15px;
-  }
+  .kpi-value.loading { color: var(--ink-4); font-size: 28px; }
 
-  /* ── Section ── */
-  .section { margin-bottom: 20px; }
+  /* ── Section header ── */
+  .section { margin-bottom: 22px; }
   .section-hd {
-    display: flex; align-items: center; gap: 10px;
-    margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
   }
-  .section-title {
-    font-size: 14px; font-weight: 600; letter-spacing: -0.01em;
+  .section-title { font-size: 14.5px; font-weight: 650; letter-spacing: -0.01em; color: var(--ink); }
+  .count-badge {
+    padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 600;
+    background: var(--bg-dg); color: #4ade80;
+    border: 1px solid rgba(74,222,128,.2);
   }
-  .badge {
-    display: inline-flex; align-items: center;
-    padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 500;
-  }
-  .badge-hot { color: var(--hot); background: var(--hot-dim); border: 1px solid var(--hot-bd); }
-  .badge-book { color: var(--book); background: var(--book-dim); border: 1px solid var(--book-bd); }
-  .badge-green { color: var(--green); background: var(--green-dim); border: 1px solid var(--green-bd); }
 
-  /* ── Table ── */
+  /* ── Table card ── */
   .table-wrap {
     background: var(--bg-card);
     border: 1px solid var(--line);
@@ -219,109 +216,113 @@
     overflow: hidden;
   }
   .table-scroll { overflow-x: auto; }
-  table {
-    width: 100%; border-collapse: collapse; font-size: 12.5px;
-  }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
   thead th {
     text-align: left;
     font-size: 10.5px; text-transform: uppercase;
-    letter-spacing: .06em; color: var(--ink-4); font-weight: 500;
-    padding: 10px 16px;
+    letter-spacing: .06em; color: var(--ink-3); font-weight: 600;
+    padding: 11px 16px;
     border-bottom: 1px solid var(--line);
-    background: var(--bg-elev);
+    background: #f8fbf9;
     white-space: nowrap;
   }
   tbody td {
     padding: 12px 16px;
     border-bottom: 1px solid var(--line);
-    color: var(--ink-2);
-    vertical-align: middle;
+    color: var(--ink-2); vertical-align: middle;
   }
   tbody tr:last-child td { border-bottom: 0; }
   tbody tr:hover td { background: var(--bg-hover); }
-  .td-primary { color: var(--ink); font-weight: 500; }
-  .td-phone { font-family: "Geist Mono", monospace; color: var(--ink-3); font-size: 12px; }
-  .td-nick { color: var(--green); font-family: "Geist Mono", monospace; font-size: 12px; }
+
+  .td-name { color: var(--ink); font-weight: 600; }
+  .td-phone { font-family:"Geist Mono",monospace; color: var(--ink-3); font-size:11.5px; }
+  .td-nick { color: var(--c1); font-family:"Geist Mono",monospace; font-size:12px; font-weight:500; }
   .td-msg {
-    max-width: 260px; white-space: nowrap;
+    max-width: 240px; white-space: nowrap;
     overflow: hidden; text-overflow: ellipsis; color: var(--ink-3);
   }
-  .trigger-chip {
-    display: inline-flex; align-items: center; gap: 4px;
-    padding: 2px 8px; border-radius: 5px; font-size: 11px; font-weight: 500;
-    background: var(--hot-dim); color: var(--hot); border: 1px solid var(--hot-bd);
-    white-space: nowrap;
-  }
-  .biz-chip {
-    display: inline-flex; align-items: center;
-    padding: 2px 8px; border-radius: 5px; font-size: 11px; font-weight: 500;
-    background: var(--bg-hover); color: var(--ink-2); border: 1px solid var(--line-str);
-    white-space: nowrap;
-  }
-  .td-time {
-    font-family: "Geist Mono", monospace; font-size: 12px;
-    color: var(--book); font-weight: 500;
-  }
-  .td-date { font-family: "Geist Mono", monospace; font-size: 11.5px; color: var(--ink-3); }
+  .td-date { font-family:"Geist Mono",monospace; font-size:11.5px; color:var(--ink-3); white-space:nowrap; }
+  .td-time { font-family:"Geist Mono",monospace; font-size:12px; color:var(--c2); font-weight:600; white-space:nowrap; }
 
-  .empty-row td {
-    text-align: center; padding: 40px; color: var(--ink-4);
-    font-size: 13px;
+  .chip-biz {
+    display: inline-flex; padding: 2px 9px; border-radius: 6px; font-size:11.5px; font-weight:500;
+    background: #f0faf4; color: var(--ink-2); border: 1px solid var(--line);
+  }
+  .chip-trigger {
+    display: inline-flex; align-items:center; gap:4px;
+    padding: 2px 8px; border-radius: 6px; font-size:11px; font-weight:600;
+    background: var(--c3d); color: var(--c3); border: 1px solid var(--c3b); white-space:nowrap;
+  }
+
+  .empty-state td {
+    text-align: center; padding: 44px; color: var(--ink-4); font-size:13px;
   }
 
   /* ── Spinner ── */
   .spinner {
-    display: flex; align-items: center; justify-content: center;
-    padding: 48px; color: var(--ink-4); gap: 10px; font-size: 13px;
+    display: flex; align-items:center; justify-content:center;
+    padding: 48px; color: var(--ink-4); gap: 10px; font-size:13px;
   }
   .spin {
-    width: 18px; height: 18px; border: 2px solid var(--line-str);
-    border-top-color: var(--green); border-radius: 50%;
+    width:18px; height:18px; border:2px solid var(--line);
+    border-top-color: var(--c1); border-radius:50%;
     animation: spin .7s linear infinite;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* ── Error banner ── */
-  .error-banner {
-    background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.3);
-    border-radius: var(--radius-sm);
-    padding: 10px 14px; color: #f87171; font-size: 12.5px;
-    margin-bottom: 16px;
-    display: flex; align-items: center; gap: 8px;
+  /* ── Error ── */
+  .err-box {
+    background: #fff5f5; border: 1px solid #fecaca;
+    border-radius: var(--radius-sm); padding: 12px 16px; margin-bottom: 18px;
   }
+  .err-title { font-weight: 600; color: #dc2626; font-size:13px; margin-bottom:4px; }
+  .err-detail { color: #ef4444; font-size:12px; font-family:"Geist Mono",monospace; word-break:break-all; }
+  .err-hint { color: #6b7280; font-size:11.5px; margin-top:6px; }
 
   /* ── Config modal ── */
   .cfg-overlay {
-    position: fixed; inset: 0; background: rgba(0,0,0,.7);
-    display: flex; align-items: center; justify-content: center; z-index: 100;
-    backdrop-filter: blur(4px);
+    position:fixed; inset:0; background:rgba(13,43,31,.7);
+    display:flex; align-items:center; justify-content:center; z-index:100;
+    backdrop-filter: blur(6px);
   }
   .cfg-box {
-    background: var(--bg-elev); border: 1px solid var(--line-str);
-    border-radius: 14px; padding: 28px; width: 480px; max-width: 95vw;
-    box-shadow: 0 24px 64px rgba(0,0,0,.7);
+    background: var(--bg-dg); border: 1px solid rgba(255,255,255,.12);
+    border-radius: 16px; padding: 30px; width: 480px; max-width: 95vw;
+    box-shadow: 0 32px 80px rgba(0,0,0,.6);
   }
-  .cfg-title { font-size: 16px; font-weight: 600; letter-spacing: -0.02em; margin-bottom: 6px; }
-  .cfg-sub { color: var(--ink-3); font-size: 12.5px; margin-bottom: 20px; }
-  .cfg-field { margin-bottom: 14px; }
-  .cfg-field label { display: block; font-size: 11.5px; color: var(--ink-3); margin-bottom: 5px; font-weight: 500; }
+  .cfg-logo { display:flex; align-items:center; gap:8px; margin-bottom:18px; }
+  .cfg-title { font-size:17px; font-weight:700; letter-spacing:-0.02em; color:#fff; margin-bottom:5px; }
+  .cfg-sub { color:var(--ink-inv3); font-size:12.5px; margin-bottom:20px; line-height:1.6; }
+  .cfg-field { margin-bottom:14px; }
+  .cfg-field label { display:block; font-size:11.5px; color:var(--ink-inv3); margin-bottom:5px; font-weight:500; }
   .cfg-field input {
-    width: 100%; background: var(--bg-card); border: 1px solid var(--line-str);
-    border-radius: var(--radius-sm); color: var(--ink); font: inherit; font-size: 13px;
-    padding: 8px 12px; outline: none;
+    width:100%; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12);
+    border-radius:var(--radius-sm); color:#fff; font:inherit; font-size:13px;
+    padding:9px 12px; outline:none;
+    transition: border-color .15s;
   }
-  .cfg-field input:focus { border-color: var(--green); }
-  .cfg-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+  .cfg-field input::placeholder { color: rgba(255,255,255,.25); }
+  .cfg-field input:focus { border-color: #4ade80; }
+  .cfg-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:22px; }
   .btn-primary {
-    padding: 7px 18px; border-radius: var(--radius-sm);
-    background: var(--green); color: #0f0f0f; font: inherit; font-size: 13px;
-    font-weight: 600; border: 0; cursor: pointer;
+    padding:8px 20px; border-radius:var(--radius-sm);
+    background: linear-gradient(135deg,#1db954,#16a34a); color:#fff;
+    font:inherit; font-size:13px; font-weight:600; border:0; cursor:pointer;
+    box-shadow: 0 2px 8px rgba(29,185,84,.3);
   }
   .btn-ghost {
-    padding: 7px 14px; border-radius: var(--radius-sm);
-    background: transparent; color: var(--ink-3); font: inherit; font-size: 13px;
-    border: 1px solid var(--line-str); cursor: pointer;
+    padding:8px 14px; border-radius:var(--radius-sm);
+    background:transparent; color:var(--ink-inv3); font:inherit; font-size:13px;
+    border:1px solid rgba(255,255,255,.12); cursor:pointer;
   }
+
+  /* ── Debug panel ── */
+  .debug-panel {
+    background:#f8fafb; border:1px solid var(--line);
+    border-radius:var(--radius-sm); padding:12px 14px; margin-bottom:16px;
+    font-family:"Geist Mono",monospace; font-size:11px; color:var(--ink-3);
+  }
+  .debug-panel summary { cursor:pointer; color:var(--ink-2); font-weight:500; font-family:"Geist",sans-serif; font-size:12px; }
 </style>
 </head>
 <body>
@@ -329,114 +330,70 @@
 <script type="text/babel" data-presets="react">
 
 const { createClient } = supabase;
-
-// ── Config ──────────────────────────────────────────────────────────────────
-const CONFIG_KEY = 'ai_sales_bot_cfg';
+const CONFIG_KEY = 'calvix_ai_cfg';
 
 function loadCfg() {
   try { return JSON.parse(localStorage.getItem(CONFIG_KEY)) || {}; }
   catch { return {}; }
 }
-function saveCfg(cfg) {
-  localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
+function saveCfg(cfg) { localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg)); }
+
+// ── date helpers ─────────────────────────────────────────────────────────────
+const todayISO  = () => new Date().toISOString().slice(0,10);
+const weekAgo   = () => { const d=new Date(); d.setDate(d.getDate()-7); return d.toISOString().slice(0,10); };
+const monthAgo  = () => { const d=new Date(); d.setDate(d.getDate()-30); return d.toISOString().slice(0,10); };
+function fmtDate(s) {
+  if (!s) return '—';
+  try { return new Date(s).toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',year:'2-digit'}); }
+  catch { return s; }
+}
+function fmtDT(s) {
+  if (!s) return '—';
+  try { return new Date(s).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}); }
+  catch { return s; }
 }
 
-// ── Icons ────────────────────────────────────────────────────────────────────
-const IconFire = () => (
-  <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 2c0 0-5 5-5 10a5 5 0 0010 0c0-3-2-5-2-5s0 3-3 3c0-4 0-8 0-8z"/>
+// ── icons ────────────────────────────────────────────────────────────────────
+const Ico = ({d,size=14}) => (
+  <svg width={size} height={size} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d={d}/>
   </svg>
 );
-const IconCalendar = () => (
-  <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/>
-    <line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/>
-  </svg>
-);
-const IconRefresh = () => (
-  <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0115-6.7L21 8"/>
-    <path d="M3 22v-6h6"/><path d="M21 12a9 9 0 01-15 6.7L3 16"/>
-  </svg>
-);
-const IconSettings = () => (
-  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+const IcoRefresh = () => <Ico size={13} d="M21 2v6h-6M3 12a9 9 0 0115-6.7L21 8M3 22v-6h6M21 12a9 9 0 01-15 6.7L3 16"/>;
+const IcoSettings = () => (
+  <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="3"/>
     <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
   </svg>
 );
-
-// ── Supabase Logo SVG ────────────────────────────────────────────────────────
-const SupabaseLogo = () => (
-  <svg width="22" height="22" viewBox="0 0 109 113" fill="none">
-    <path d="M63.7 110.3c-2.6 3.3-8 1.5-8-2.6V62.5H99c6.8 0 10.5 7.9 6.2 13.1l-41.5 34.7z" fill="url(#sb-a)"/>
-    <path d="M63.7 110.3c-2.6 3.3-8 1.5-8-2.6V62.5H99c6.8 0 10.5 7.9 6.2 13.1l-41.5 34.7z" fill="url(#sb-b)" fillOpacity=".2"/>
-    <path d="M45.3 2.5c2.6-3.3 8-1.5 8 2.6v45.2H10c-6.8 0-10.5-7.9-6.2-13.1L45.3 2.5z" fill="#3ECF8E"/>
-    <defs>
-      <linearGradient id="sb-a" x1="53.7" y1="74.9" x2="94.1" y2="99.5" gradientUnits="userSpaceOnUse">
-        <stop stopColor="#249361"/>
-        <stop offset="1" stopColor="#3ECF8E"/>
-      </linearGradient>
-      <linearGradient id="sb-b" x1="36.2" y1="60.8" x2="61.2" y2="79.4" gradientUnits="userSpaceOnUse">
-        <stop/>
-        <stop offset="1" stopOpacity="0"/>
-      </linearGradient>
-    </defs>
-  </svg>
-);
-
-// ── Date helpers ──────────────────────────────────────────────────────────────
-function todayISO() {
-  return new Date().toISOString().slice(0, 10);
-}
-function weekAgoISO() {
-  const d = new Date(); d.setDate(d.getDate() - 7);
-  return d.toISOString().slice(0, 10);
-}
-function monthAgoISO() {
-  const d = new Date(); d.setDate(d.getDate() - 30);
-  return d.toISOString().slice(0, 10);
-}
-function fmtDate(str) {
-  if (!str) return '—';
-  try { return new Date(str).toLocaleDateString('ru-RU', { day:'2-digit', month:'2-digit', year:'2-digit' }); }
-  catch { return str; }
-}
-function fmtDateTime(str) {
-  if (!str) return '—';
-  try { return new Date(str).toLocaleString('ru-RU', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }); }
-  catch { return str; }
-}
 
 // ── Config Modal ──────────────────────────────────────────────────────────────
 function ConfigModal({ cfg, onSave, onClose }) {
   const [url, setUrl] = React.useState(cfg.url || '');
   const [key, setKey] = React.useState(cfg.key || '');
   return (
-    <div className="cfg-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+    <div className="cfg-overlay" onClick={e => e.target===e.currentTarget && onClose()}>
       <div className="cfg-box">
-        <div className="cfg-title">Настройка Supabase</div>
-        <div className="cfg-sub">Введите данные проекта — Project URL и anon key из Settings → API</div>
-        <div className="cfg-field">
-          <label>Project URL</label>
-          <input
-            value={url}
-            onChange={e => setUrl(e.target.value)}
-            placeholder="https://xxxx.supabase.co"
-          />
+        <div className="cfg-logo">
+          <div style={{width:28,height:28,background:'linear-gradient(135deg,#1db954,#0d7a38)',borderRadius:7,display:'grid',placeItems:'center',fontWeight:700,fontSize:13,color:'#fff'}}>C</div>
+          <span style={{color:'#fff',fontWeight:700,fontSize:15,letterSpacing:'-0.02em'}}>Calvix <span style={{color:'#4ade80'}}>AI</span></span>
+        </div>
+        <div className="cfg-title">Подключение Supabase</div>
+        <div className="cfg-sub">
+          Project URL и anon public key из<br/>
+          <strong style={{color:'rgba(255,255,255,.6)'}}>Supabase → Settings → API</strong>
         </div>
         <div className="cfg-field">
-          <label>Anon Key</label>
-          <input
-            value={key}
-            onChange={e => setKey(e.target.value)}
-            placeholder="eyJhbGciOiJI..."
-            type="password"
-          />
+          <label>Project URL</label>
+          <input value={url} onChange={e=>setUrl(e.target.value)} placeholder="https://xxxxxxxxxxxx.supabase.co"/>
+        </div>
+        <div className="cfg-field">
+          <label>Anon Public Key</label>
+          <input value={key} onChange={e=>setKey(e.target.value)} placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." type="password"/>
         </div>
         <div className="cfg-actions">
           <button className="btn-ghost" onClick={onClose}>Отмена</button>
-          <button className="btn-primary" onClick={() => onSave({ url, key })}>Сохранить</button>
+          <button className="btn-primary" onClick={()=>onSave({url:url.trim(),key:key.trim()})}>Подключить</button>
         </div>
       </div>
     </div>
@@ -444,121 +401,119 @@ function ConfigModal({ cfg, onSave, onClose }) {
 }
 
 // ── KPI Card ──────────────────────────────────────────────────────────────────
-function KpiCard({ label, value, icon, accentColor, iconBg }) {
+function KpiCard({label, value, emoji, color, bg}) {
   return (
-    <div className="kpi-card" style={{ '--accent-color': accentColor, '--icon-bg': iconBg }}>
+    <div className="kpi-card" style={{'--kpi-color':color,'--kpi-bg':bg}}>
+      <div className="kpi-icon-wrap">{emoji}</div>
       <div className="kpi-label">{label}</div>
-      <div className="kpi-value">{value ?? <span style={{color:'var(--ink-4)'}}>—</span>}</div>
-      <div className="kpi-icon">{icon}</div>
+      <div className={`kpi-value${value===null?' loading':''}`}>
+        {value === null ? '...' : value}
+      </div>
     </div>
   );
 }
 
-// ── Main App ──────────────────────────────────────────────────────────────────
+// ── Main ──────────────────────────────────────────────────────────────────────
 function App() {
-  const [cfg, setCfg] = React.useState(loadCfg);
-  const [showCfg, setShowCfg] = React.useState(!cfg.url || !cfg.key);
+  const [cfg, setCfg]         = React.useState(loadCfg);
+  const [showCfg, setShowCfg] = React.useState(!loadCfg().url || !loadCfg().key);
 
-  const [hotLeads, setHotLeads]   = React.useState([]);
-  const [bookings, setBookings]   = React.useState([]);
-  const [loading, setLoading]     = React.useState(false);
-  const [error, setError]         = React.useState(null);
+  const [hotLeads, setHotLeads] = React.useState([]);
+  const [bookings, setBookings] = React.useState([]);
+  const [totals, setTotals]     = React.useState({hot:null,book:null,hotToday:null,bookToday:null});
+  const [loading, setLoading]   = React.useState(false);
+  const [error, setError]       = React.useState(null);
+  const [debugInfo, setDebug]   = React.useState(null);
   const [lastRefresh, setLastRefresh] = React.useState(null);
 
-  const [datePeriod, setDatePeriod] = React.useState('week');
-  const [bizFilter, setBizFilter]   = React.useState('all');
+  const [period, setPeriod]   = React.useState('week');
+  const [bizFilter, setBiz]   = React.useState('all');
 
   const client = React.useMemo(() => {
-    if (cfg.url && cfg.key) return createClient(cfg.url, cfg.key);
+    if (cfg.url && cfg.key) {
+      try { return createClient(cfg.url, cfg.key); }
+      catch(e) { return null; }
+    }
     return null;
   }, [cfg.url, cfg.key]);
 
   const fetchData = React.useCallback(async () => {
     if (!client) return;
-    setLoading(true); setError(null);
+    setLoading(true); setError(null); setDebug(null);
     try {
-      let dateFrom = null;
-      if (datePeriod === 'today') dateFrom = todayISO();
-      else if (datePeriod === 'week')  dateFrom = weekAgoISO();
-      else if (datePeriod === 'month') dateFrom = monthAgoISO();
+      const dateFrom = period==='today' ? todayISO() : period==='week' ? weekAgo() : period==='month' ? monthAgo() : null;
 
-      let hotQ = client.from('hot_leads').select('*').order('date', { ascending: false });
-      if (dateFrom) hotQ = hotQ.gte('date', dateFrom);
-      if (bizFilter !== 'all') hotQ = hotQ.eq('business_name', bizFilter);
+      let hq = client.from('hot_leads').select('*').order('created_at',{ascending:false});
+      let bq = client.from('bookings').select('*').order('created_at',{ascending:false});
+      if (dateFrom) { hq=hq.gte('created_at',dateFrom); bq=bq.gte('created_at',dateFrom); }
+      if (bizFilter!=='all') { hq=hq.eq('business_name',bizFilter); bq=bq.eq('business_name',bizFilter); }
 
-      let bookQ = client.from('bookings').select('*').order('booking_date', { ascending: false });
-      if (dateFrom) bookQ = bookQ.gte('booking_date', dateFrom);
-      if (bizFilter !== 'all') bookQ = bookQ.eq('business_name', bizFilter);
+      const [h, b] = await Promise.all([hq, bq]);
 
-      const [{ data: hl, error: he }, { data: bk, error: be }] = await Promise.all([hotQ, bookQ]);
-      if (he) throw he;
-      if (be) throw be;
-      setHotLeads(hl || []);
-      setBookings(bk || []);
+      if (h.error || b.error) {
+        const err = h.error || b.error;
+        setDebug({ hErr: h.error, bErr: b.error, hCols: h.data?.[0] ? Object.keys(h.data[0]) : null });
+        throw new Error(err.message || err.code || JSON.stringify(err));
+      }
+
+      setHotLeads(h.data || []);
+      setBookings(b.data || []);
+      if (h.data?.[0]) setDebug({cols_hot: Object.keys(h.data[0]), cols_book: b.data?.[0] ? Object.keys(b.data[0]) : null});
       setLastRefresh(new Date());
-    } catch (e) {
-      setError(e.message || 'Ошибка загрузки данных');
+    } catch(e) {
+      setError(e.message);
     } finally {
       setLoading(false);
     }
-  }, [client, datePeriod, bizFilter]);
+  }, [client, period, bizFilter]);
+
+  // totals (unfiltered)
+  React.useEffect(() => {
+    if (!client) return;
+    const today = todayISO();
+    Promise.all([
+      client.from('hot_leads').select('*',{count:'exact',head:true}),
+      client.from('bookings').select('*',{count:'exact',head:true}),
+      client.from('hot_leads').select('*',{count:'exact',head:true}).gte('created_at',today),
+      client.from('bookings').select('*',{count:'exact',head:true}).gte('created_at',today),
+    ]).then(([h,b,ht,bt]) => {
+      setTotals({hot:h.count??0, book:b.count??0, hotToday:ht.count??0, bookToday:bt.count??0});
+    });
+  }, [client]);
 
   React.useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Unfiltered counts for KPI (total and today)
-  const [totals, setTotals] = React.useState({ hot: null, book: null, hotToday: null, bookToday: null });
-  React.useEffect(() => {
-    if (!client) return;
-    (async () => {
-      const today = todayISO();
-      const [
-        { count: hot },
-        { count: book },
-        { count: hotToday },
-        { count: bookToday }
-      ] = await Promise.all([
-        client.from('hot_leads').select('*', { count: 'exact', head: true }),
-        client.from('bookings').select('*', { count: 'exact', head: true }),
-        client.from('hot_leads').select('*', { count: 'exact', head: true }).gte('date', today),
-        client.from('bookings').select('*', { count: 'exact', head: true }).gte('booking_date', today),
-      ]);
-      setTotals({ hot, book, hotToday, bookToday });
-    })();
-  }, [client]);
-
-  // Business list for filter
   const businesses = React.useMemo(() => {
-    const all = [...hotLeads, ...bookings].map(r => r.business_name).filter(Boolean);
+    const all = [...hotLeads,...bookings].map(r=>r.business_name).filter(Boolean);
     return [...new Set(all)].sort();
   }, [hotLeads, bookings]);
 
-  function handleSaveCfg(newCfg) {
-    saveCfg(newCfg); setCfg(newCfg); setShowCfg(false);
-  }
+  function handleSaveCfg(c) { saveCfg(c); setCfg(c); setShowCfg(false); }
+
+  // smart column access
+  const col = (row, ...names) => { for (const n of names) if (row[n]!=null) return row[n]; return null; };
 
   return (
     <div className="shell">
-      {showCfg && <ConfigModal cfg={cfg} onSave={handleSaveCfg} onClose={() => setShowCfg(false)} />}
+      {showCfg && <ConfigModal cfg={cfg} onSave={handleSaveCfg} onClose={()=>setShowCfg(false)}/>}
 
       {/* Header */}
       <header className="header">
         <div className="header-inner">
           <div className="logo-wrap">
-            <div className="logo-badge"><SupabaseLogo /></div>
+            <div className="logo-mark">C</div>
             <div>
-              <div className="logo-name">AI <span>Sales</span> Bot</div>
+              <div className="logo-text">Calvix <span>AI</span></div>
+              <div className="logo-sub">Sales Bot Platform</div>
             </div>
           </div>
           <div className="header-right">
-            <div className="live-dot">
-              <i />{lastRefresh ? lastRefresh.toLocaleTimeString('ru-RU', {hour:'2-digit',minute:'2-digit'}) : 'ожидание'}
+            <div className="live-badge">
+              <span className="live-dot"/>
+              {lastRefresh ? lastRefresh.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}) : 'ожидание'}
             </div>
-            <button className="refresh-btn" onClick={fetchData} title="Обновить">
-              <IconRefresh /> Обновить
-            </button>
-            <button className="refresh-btn" onClick={() => setShowCfg(true)} title="Настройки">
-              <IconSettings /> Supabase
-            </button>
+            <button className="hdr-btn" onClick={fetchData}><IcoRefresh/> Обновить</button>
+            <button className="hdr-btn" onClick={()=>setShowCfg(true)}><IcoSettings/> Supabase</button>
           </div>
         </div>
       </header>
@@ -567,102 +522,94 @@ function App() {
       <div className="controls">
         <div className="controls-inner">
           <span className="ctrl-label">Бизнес:</span>
-          <select className="sel" value={bizFilter} onChange={e => setBizFilter(e.target.value)}>
+          <select className="sel" value={bizFilter} onChange={e=>setBiz(e.target.value)}>
             <option value="all">Все бизнесы</option>
-            {businesses.map(b => <option key={b} value={b}>{b}</option>)}
+            {businesses.map(b=><option key={b} value={b}>{b}</option>)}
           </select>
           <span className="ctrl-label" style={{marginLeft:8}}>Период:</span>
           <div className="seg">
-            {[['today','Сегодня'],['week','Неделя'],['month','Месяц'],['all','Всё время']].map(([v,l]) => (
-              <button key={v} className={datePeriod===v?'on':''} onClick={() => setDatePeriod(v)}>{l}</button>
+            {[['today','Сегодня'],['week','Неделя'],['month','Месяц'],['all','Всё время']].map(([v,l])=>(
+              <button key={v} className={period===v?'on':''} onClick={()=>setPeriod(v)}>{l}</button>
             ))}
           </div>
+          <div className="ctrl-spacer"/>
         </div>
       </div>
 
       {/* Page */}
       <div className="page">
-        {error && <div className="error-banner">⚠ {error}</div>}
+
+        {/* Error */}
+        {error && (
+          <div className="err-box">
+            <div className="err-title">⚠ Ошибка загрузки данных</div>
+            <div className="err-detail">{error}</div>
+            <div className="err-hint">
+              Проверь: 1) URL и anon key верны; 2) таблицы <code>hot_leads</code> и <code>bookings</code> существуют;
+              3) RLS отключён или добавлена политика <code>select for anon</code>
+            </div>
+          </div>
+        )}
+
+        {/* Debug */}
+        {debugInfo && (
+          <details className="debug-panel">
+            <summary>🔍 Найденные колонки (для отладки)</summary>
+            <pre style={{marginTop:8}}>{JSON.stringify(debugInfo, null, 2)}</pre>
+          </details>
+        )}
 
         {/* KPI */}
         <div className="kpi-grid">
-          <KpiCard
-            label="Всего HOT лидов"
-            value={totals.hot}
-            accentColor="var(--hot)"
-            iconBg="var(--hot-dim)"
-            icon={<span style={{fontSize:16}}>🔥</span>}
-          />
-          <KpiCard
-            label="Всего записей на созвон"
-            value={totals.book}
-            accentColor="var(--book)"
-            iconBg="var(--book-dim)"
-            icon={<span style={{fontSize:16}}>📅</span>}
-          />
-          <KpiCard
-            label="HOT лидов сегодня"
-            value={totals.hotToday}
-            accentColor="var(--green)"
-            iconBg="var(--green-dim)"
-            icon={<span style={{fontSize:16}}>⚡</span>}
-          />
-          <KpiCard
-            label="Записей сегодня"
-            value={totals.bookToday}
-            accentColor="#a78bfa"
-            iconBg="rgba(167,139,250,.12)"
-            icon={<span style={{fontSize:16}}>✅</span>}
-          />
+          <KpiCard label="Всего HOT лидов"       value={totals.hot}      emoji="🔥" color="var(--c3)" bg="var(--c3d)"/>
+          <KpiCard label="Всего записей на созвон" value={totals.book}    emoji="📅" color="var(--c2)" bg="var(--c2d)"/>
+          <KpiCard label="HOT лидов сегодня"     value={totals.hotToday} emoji="⚡" color="var(--c1)" bg="var(--c1d)"/>
+          <KpiCard label="Записей сегодня"       value={totals.bookToday} emoji="✅" color="var(--c4)" bg="var(--c4d)"/>
         </div>
 
         {/* HOT Leads */}
         <div className="section">
           <div className="section-hd">
             <div className="section-title">🔥 HOT Лиды</div>
-            <span className="badge badge-hot">{hotLeads.length} записей</span>
+            <span className="count-badge">{hotLeads.length}</span>
           </div>
           <div className="table-wrap">
-            {loading ? (
-              <div className="spinner"><div className="spin"/> Загрузка...</div>
-            ) : (
-              <div className="table-scroll">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Бизнес</th>
-                      <th>Имя</th>
-                      <th>Никнейм</th>
-                      <th>Телефон</th>
-                      <th>Триггер</th>
-                      <th>Последнее сообщение</th>
-                      <th>Дата</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {hotLeads.length === 0 ? (
-                      <tr className="empty-row"><td colSpan="7">Нет данных за выбранный период</td></tr>
-                    ) : hotLeads.map((r, i) => (
-                      <tr key={i}>
-                        <td><span className="biz-chip">{r.business_name || '—'}</span></td>
-                        <td className="td-primary">{r.client_name || r.name || '—'}</td>
-                        <td className="td-nick">{r.username ? `@${r.username}` : '—'}</td>
-                        <td className="td-phone">{r.phone || '—'}</td>
-                        <td>
-                          {r.trigger_word
-                            ? <span className="trigger-chip">🎯 {r.trigger_word}</span>
-                            : <span style={{color:'var(--ink-4)'}}>—</span>}
-                        </td>
-                        <td className="td-msg" title={r.last_message || r.message || ''}>
-                          {r.last_message || r.message || '—'}
-                        </td>
-                        <td className="td-date">{fmtDate(r.date || r.created_at)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+            {loading
+              ? <div className="spinner"><div className="spin"/> Загрузка...</div>
+              : <div className="table-scroll">
+                  <table>
+                    <thead><tr>
+                      <th>Бизнес</th><th>Имя</th><th>Никнейм</th><th>Телефон</th>
+                      <th>Триггер</th><th>Последнее сообщение</th><th>Дата</th>
+                    </tr></thead>
+                    <tbody>
+                      {hotLeads.length===0
+                        ? <tr className="empty-state"><td colSpan="7">Нет данных за выбранный период</td></tr>
+                        : hotLeads.map((r,i)=>{
+                            const biz  = col(r,'business_name','bot_name','company');
+                            const name = col(r,'client_name','name','first_name','full_name');
+                            const nick = col(r,'username','nickname','telegram_username');
+                            const ph   = col(r,'phone','phone_number','tel');
+                            const trg  = col(r,'trigger_word','trigger','keyword');
+                            const msg  = col(r,'last_message','message','text','last_msg');
+                            const dt   = col(r,'date','created_at','timestamp','ts');
+                            return (
+                              <tr key={i}>
+                                <td><span className="chip-biz">{biz||'—'}</span></td>
+                                <td className="td-name">{name||'—'}</td>
+                                <td className="td-nick">{nick?`@${nick.replace(/^@/,'')}`:'—'}</td>
+                                <td className="td-phone">{ph||'—'}</td>
+                                <td>{trg?<span className="chip-trigger">🎯 {trg}</span>:<span style={{color:'var(--ink-4)'}}>—</span>}</td>
+                                <td className="td-msg" title={msg||''}>{msg||'—'}</td>
+                                <td className="td-date">{fmtDate(dt)}</td>
+                              </tr>
+                            );
+                          })
+                      }
+                    </tbody>
+                  </table>
+                </div>
+            }
           </div>
         </div>
 
@@ -670,41 +617,43 @@ function App() {
         <div className="section">
           <div className="section-hd">
             <div className="section-title">📅 Записи на созвон</div>
-            <span className="badge badge-book">{bookings.length} записей</span>
+            <span className="count-badge">{bookings.length}</span>
           </div>
           <div className="table-wrap">
-            {loading ? (
-              <div className="spinner"><div className="spin"/> Загрузка...</div>
-            ) : (
-              <div className="table-scroll">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Бизнес</th>
-                      <th>Имя</th>
-                      <th>Никнейм</th>
-                      <th>Телефон</th>
-                      <th>Время созвона</th>
-                      <th>Дата записи</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {bookings.length === 0 ? (
-                      <tr className="empty-row"><td colSpan="6">Нет данных за выбранный период</td></tr>
-                    ) : bookings.map((r, i) => (
-                      <tr key={i}>
-                        <td><span className="biz-chip">{r.business_name || '—'}</span></td>
-                        <td className="td-primary">{r.client_name || r.name || '—'}</td>
-                        <td className="td-nick">{r.username ? `@${r.username}` : '—'}</td>
-                        <td className="td-phone">{r.phone || '—'}</td>
-                        <td className="td-time">{fmtDateTime(r.call_datetime || r.call_time)}</td>
-                        <td className="td-date">{fmtDate(r.booking_date || r.created_at)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+            {loading
+              ? <div className="spinner"><div className="spin"/> Загрузка...</div>
+              : <div className="table-scroll">
+                  <table>
+                    <thead><tr>
+                      <th>Бизнес</th><th>Имя</th><th>Никнейм</th><th>Телефон</th>
+                      <th>Время созвона</th><th>Дата записи</th>
+                    </tr></thead>
+                    <tbody>
+                      {bookings.length===0
+                        ? <tr className="empty-state"><td colSpan="6">Нет данных за выбранный период</td></tr>
+                        : bookings.map((r,i)=>{
+                            const biz  = col(r,'business_name','bot_name','company');
+                            const name = col(r,'client_name','name','first_name','full_name');
+                            const nick = col(r,'username','nickname','telegram_username');
+                            const ph   = col(r,'phone','phone_number','tel');
+                            const call = col(r,'call_datetime','call_time','scheduled_at','call_at','datetime');
+                            const booked = col(r,'booking_date','created_at','booked_at','timestamp');
+                            return (
+                              <tr key={i}>
+                                <td><span className="chip-biz">{biz||'—'}</span></td>
+                                <td className="td-name">{name||'—'}</td>
+                                <td className="td-nick">{nick?`@${nick.replace(/^@/,'')}`:'—'}</td>
+                                <td className="td-phone">{ph||'—'}</td>
+                                <td className="td-time">{fmtDT(call)}</td>
+                                <td className="td-date">{fmtDate(booked)}</td>
+                              </tr>
+                            );
+                          })
+                      }
+                    </tbody>
+                  </table>
+                </div>
+            }
           </div>
         </div>
       </div>
@@ -712,7 +661,7 @@ function App() {
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 </script>
 </body>
 </html>
