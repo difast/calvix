@@ -4,7 +4,6 @@ from aiogram.fsm.context import FSMContext
 
 from bot.fsm.booking import BookingStates
 from bot.services.booking import create_booking, validate_phone, validate_datetime
-from bot.services.business_loader import BusinessLoader
 from bot.services.analytics import analytics
 from bot.services.supabase_sync import supabase_sync
 from bot.repositories import LeadRepository
@@ -14,7 +13,6 @@ from bot.config import settings
 def create_callback_router() -> Router:
     router = Router()
     lead_repo = LeadRepository()
-    loader = BusinessLoader()
 
     @router.callback_query(F.data == "book_call")
     async def book_call_start(callback: CallbackQuery, state: FSMContext, **kwargs):
@@ -75,67 +73,76 @@ def create_callback_router() -> Router:
 
     @router.callback_query(F.data == "confirm_booking")
     async def confirm_booking(callback: CallbackQuery, state: FSMContext, **kwargs):
-        state_data = await state.get_data()
-        phone = state_data.get("phone")
-        scheduled_datetime = state_data.get("scheduled_datetime")
-        lead_id = state_data.get("lead_id")
-        business_id = kwargs.get("business_id", 1)
-        business = kwargs.get("business")
+        try:
+            state_data = await state.get_data()
+            phone = state_data.get("phone")
+            scheduled_datetime = state_data.get("scheduled_datetime")
+            lead_id = state_data.get("lead_id")
+            business_id = kwargs.get("business_id", 1)
+            business = kwargs.get("business")
 
-        if not all([phone, scheduled_datetime]):
-            await callback.message.answer("❌ Ошибка. Начните запись заново.")
-            await state.clear()
-            await callback.answer()
-            return
+            if not phone or not scheduled_datetime:
+                await callback.message.answer("❌ Ошибка. Начните запись заново.")
+                await state.clear()
+                return
 
-        success, message_text = await create_booking(lead_id, phone, scheduled_datetime, None)
-
-        if success:
+            _, message_text = await create_booking(lead_id, phone, scheduled_datetime, None, business_id)
             await callback.message.answer(message_text)
+            await state.clear()
 
-            # Трекинг аналитики
-            await analytics.track("booking_created", business_id, lead_id, {
-                "phone": phone,
-                "scheduled_datetime": scheduled_datetime
-            })
-
-            # Получаем данные лида
-            lead = await lead_repo.get(lead_id) if lead_id else None
+            # Данные лида для уведомления
+            try:
+                lead = await lead_repo.get(lead_id) if lead_id else None
+            except Exception:
+                lead = None
 
             # Уведомление админу
             for admin_id in settings.admin_ids:
                 try:
-                    await callback.bot.send_message(
+                    await callback.message.bot.send_message(
                         admin_id,
                         f"📅 НОВАЯ ЗАПИСЬ НА СОЗВОН!\n"
-                        f"Бизнес ID: {business_id}\n"
-                        f"Клиент: {lead.full_name if lead else 'Неизвестно'}\n"
-                        f"Username: @{lead.username if lead else 'нет'}\n"
+                        f"Бизнес: {business.name if business else business_id}\n"
+                        f"Клиент: {lead.full_name if lead else callback.from_user.full_name}\n"
+                        f"Username: @{lead.username if lead else callback.from_user.username or 'нет'}\n"
                         f"📞 Телефон: {phone}\n"
                         f"🕐 Время: {scheduled_datetime}"
                     )
                 except Exception as e:
-                    print(f"Ошибка уведомления: {e}")
+                    print(f"Ошибка уведомления о записи: {e}")
 
             # Синхронизация с Supabase
             try:
                 await supabase_sync.push_booking(
                     business_id=business_id,
                     business_name=business.name if business else "Неизвестно",
-                    telegram_id=lead.telegram_id if lead else 0,
-                    username=lead.username if lead else "",
-                    full_name=lead.full_name if lead else "Неизвестно",
+                    telegram_id=lead.telegram_id if lead else callback.from_user.id,
+                    username=lead.username if lead else (callback.from_user.username or ""),
+                    full_name=lead.full_name if lead else (callback.from_user.full_name or ""),
                     phone=phone,
                     scheduled_datetime=scheduled_datetime
                 )
             except Exception as e:
                 print(f"Supabase booking sync error: {e}")
 
-        else:
-            await callback.message.answer("❌ Ошибка записи. Попробуйте позже.")
+            # Трекинг
+            await analytics.track("booking_created", business_id, lead_id, {
+                "phone": phone,
+                "scheduled_datetime": scheduled_datetime
+            })
 
-        await state.clear()
-        await callback.answer()
+        except Exception as e:
+            print(f"❌ Критическая ошибка confirm_booking: {e}")
+            try:
+                await callback.message.answer("❌ Произошла ошибка. Попробуйте позже.")
+                await state.clear()
+            except Exception:
+                pass
+        finally:
+            try:
+                await callback.answer()
+            except Exception:
+                pass
 
     @router.callback_query(F.data == "cancel_booking")
     async def cancel_booking(callback: CallbackQuery, state: FSMContext, **kwargs):

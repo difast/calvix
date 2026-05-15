@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 SUPABASE_PROJECT = "mvhivbqfgteregyhmlhf"
 SUPABASE_API_URL = f"https://{SUPABASE_PROJECT}.supabase.co/rest/v1"
-SUPABASE_KEY = "sb_publishable_mIngZ9OT67sZjbKr9XMRfg_9iLwkq95"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im12aGl2YnFmZ3RlcmVneWhtbGhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3ODY4NzUsImV4cCI6MjA5NDM2Mjg3NX0.VOfoL-ZO5sNNu9GAEuGPelMOIEqLRSzgqsuzSkVCt1E"
 
 HEADERS = {
     "apikey": SUPABASE_KEY,

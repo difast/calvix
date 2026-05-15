@@ -109,13 +109,14 @@ def create_message_router() -> Router:
                     await message.bot.send_message(
                         admin_id,
                         f"🔥 HOT ЛИД!\n"
-                        f"Бизнес ID: {business_id}\n"
-                        f"Клиент: {lead.full_name or 'Неизвестно'}\n"
-                        f"Username: @{lead.username or 'нет'}\n"
+                        f"Бизнес: {business.name if business else business_id}\n"
+                        f"Клиент: {lead.full_name or full_name or 'Неизвестно'}\n"
+                        f"Username: @{lead.username or username or 'нет'}\n"
                         f"Написал: {user_text}"
                     )
+                    print(f"✅ HOT уведомление отправлено admin {admin_id}")
                 except Exception as e:
-                    print(f"Ошибка уведомления: {e}")
+                    print(f"❌ Ошибка HOT уведомления admin {admin_id}: {e}")
 
             # Синхронизация с Supabase
             try:

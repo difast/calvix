@@ -8,10 +8,9 @@ class Booking(Base):
     __tablename__ = "bookings"
 
     id = Column(Integer, primary_key=True)
-    lead_id = Column(Integer, ForeignKey("leads.id", ondelete="CASCADE"), nullable=False)
-    #business_id = Column(Integer, ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False)
+    lead_id = Column(Integer, ForeignKey("leads.id", ondelete="SET NULL"), nullable=True)
     business_id = mapped_column(BigInteger, ForeignKey("businesses.id"))
-    scheduled_at = Column(DateTime)
+    scheduled_at = Column(DateTime, nullable=True)
     phone = Column(String(50))
     status = Column(String(50), default="pending")
     created_at = Column(DateTime, server_default=func.now())
