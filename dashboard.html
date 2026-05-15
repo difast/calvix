@@ -331,10 +331,14 @@
 
 const { createClient } = supabase;
 const CONFIG_KEY = 'calvix_ai_cfg';
+const DEFAULT_CFG = {
+  url: 'https://mvhivbqfgteregyhmlhf.supabase.co',
+  key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im12aGl2YnFmZ3RlcmVneWhtbGhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3ODY4NzUsImV4cCI6MjA5NDM2Mjg3NX0.VOfoL-ZO5sNNu9GAEuGPelMOIEqLRSzgqsuzSkVCt1E',
+};
 
 function loadCfg() {
-  try { return JSON.parse(localStorage.getItem(CONFIG_KEY)) || {}; }
-  catch { return {}; }
+  try { return JSON.parse(localStorage.getItem(CONFIG_KEY)) || DEFAULT_CFG; }
+  catch { return DEFAULT_CFG; }
 }
 function saveCfg(cfg) { localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg)); }
 
@@ -416,7 +420,7 @@ function KpiCard({label, value, emoji, color, bg}) {
 // ── Main ──────────────────────────────────────────────────────────────────────
 function App() {
   const [cfg, setCfg]         = React.useState(loadCfg);
-  const [showCfg, setShowCfg] = React.useState(!loadCfg().url || !loadCfg().key);
+  const [showCfg, setShowCfg] = React.useState(false);
 
   const [hotLeads, setHotLeads] = React.useState([]);
   const [bookings, setBookings] = React.useState([]);
@@ -443,8 +447,8 @@ function App() {
     try {
       const dateFrom = period==='today' ? todayISO() : period==='week' ? weekAgo() : period==='month' ? monthAgo() : null;
 
-      let hq = client.from('hot_leads').select('*').order('created_at',{ascending:false});
-      let bq = client.from('bookings').select('*').order('created_at',{ascending:false});
+      let hq = client.from('hot_leads').select('id,business_name,full_name,username,phone,last_message,trigger_word,status,created_at').order('created_at',{ascending:false});
+      let bq = client.from('bookings').select('id,business_name,full_name,username,phone,scheduled_datetime,created_at').order('created_at',{ascending:false});
       if (dateFrom) { hq=hq.gte('created_at',dateFrom); bq=bq.gte('created_at',dateFrom); }
       if (bizFilter!=='all') { hq=hq.eq('business_name',bizFilter); bq=bq.eq('business_name',bizFilter); }
 
@@ -452,13 +456,11 @@ function App() {
 
       if (h.error || b.error) {
         const err = h.error || b.error;
-        setDebug({ hErr: h.error, bErr: b.error, hCols: h.data?.[0] ? Object.keys(h.data[0]) : null });
         throw new Error(err.message || err.code || JSON.stringify(err));
       }
 
       setHotLeads(h.data || []);
       setBookings(b.data || []);
-      if (h.data?.[0]) setDebug({cols_hot: Object.keys(h.data[0]), cols_book: b.data?.[0] ? Object.keys(b.data[0]) : null});
       setLastRefresh(new Date());
     } catch(e) {
       setError(e.message);
@@ -585,26 +587,17 @@ function App() {
                     <tbody>
                       {hotLeads.length===0
                         ? <tr className="empty-state"><td colSpan="7">Нет данных за выбранный период</td></tr>
-                        : hotLeads.map((r,i)=>{
-                            const biz  = col(r,'business_name','bot_name','company');
-                            const name = col(r,'client_name','name','first_name','full_name');
-                            const nick = col(r,'username','nickname','telegram_username');
-                            const ph   = col(r,'phone','phone_number','tel');
-                            const trg  = col(r,'trigger_word','trigger','keyword');
-                            const msg  = col(r,'last_message','message','text','last_msg');
-                            const dt   = col(r,'date','created_at','timestamp','ts');
-                            return (
-                              <tr key={i}>
-                                <td><span className="chip-biz">{biz||'—'}</span></td>
-                                <td className="td-name">{name||'—'}</td>
-                                <td className="td-nick">{nick?`@${nick.replace(/^@/,'')}`:'—'}</td>
-                                <td className="td-phone">{ph||'—'}</td>
-                                <td>{trg?<span className="chip-trigger">🎯 {trg}</span>:<span style={{color:'var(--ink-4)'}}>—</span>}</td>
-                                <td className="td-msg" title={msg||''}>{msg||'—'}</td>
-                                <td className="td-date">{fmtDate(dt)}</td>
-                              </tr>
-                            );
-                          })
+                        : hotLeads.map((r,i)=>(
+                            <tr key={r.id||i}>
+                              <td><span className="chip-biz">{r.business_name||'—'}</span></td>
+                              <td className="td-name">{r.full_name||'—'}</td>
+                              <td className="td-nick">{r.username?`@${r.username.replace(/^@/,'')}`:'—'}</td>
+                              <td className="td-phone">{r.phone||'—'}</td>
+                              <td>{r.trigger_word?<span className="chip-trigger">🎯 {r.trigger_word}</span>:<span style={{color:'var(--ink-4)'}}>—</span>}</td>
+                              <td className="td-msg" title={r.last_message||''}>{r.last_message||'—'}</td>
+                              <td className="td-date">{fmtDate(r.created_at)}</td>
+                            </tr>
+                          ))
                       }
                     </tbody>
                   </table>
@@ -631,24 +624,16 @@ function App() {
                     <tbody>
                       {bookings.length===0
                         ? <tr className="empty-state"><td colSpan="6">Нет данных за выбранный период</td></tr>
-                        : bookings.map((r,i)=>{
-                            const biz  = col(r,'business_name','bot_name','company');
-                            const name = col(r,'client_name','name','first_name','full_name');
-                            const nick = col(r,'username','nickname','telegram_username');
-                            const ph   = col(r,'phone','phone_number','tel');
-                            const call = col(r,'call_datetime','call_time','scheduled_at','call_at','datetime');
-                            const booked = col(r,'booking_date','created_at','booked_at','timestamp');
-                            return (
-                              <tr key={i}>
-                                <td><span className="chip-biz">{biz||'—'}</span></td>
-                                <td className="td-name">{name||'—'}</td>
-                                <td className="td-nick">{nick?`@${nick.replace(/^@/,'')}`:'—'}</td>
-                                <td className="td-phone">{ph||'—'}</td>
-                                <td className="td-time">{fmtDT(call)}</td>
-                                <td className="td-date">{fmtDate(booked)}</td>
-                              </tr>
-                            );
-                          })
+                        : bookings.map((r,i)=>(
+                            <tr key={r.id||i}>
+                              <td><span className="chip-biz">{r.business_name||'—'}</span></td>
+                              <td className="td-name">{r.full_name||'—'}</td>
+                              <td className="td-nick">{r.username?`@${r.username.replace(/^@/,'')}`:'—'}</td>
+                              <td className="td-phone">{r.phone||'—'}</td>
+                              <td className="td-time">{r.scheduled_datetime||'—'}</td>
+                              <td className="td-date">{fmtDate(r.created_at)}</td>
+                            </tr>
+                          ))
                       }
                     </tbody>
                   </table>
