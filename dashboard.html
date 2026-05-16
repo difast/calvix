@@ -761,6 +761,166 @@ function LeadsTab({auth}){
   );
 }
 
+// ── Analytics Tab ─────────────────────────────────────────────────────────────
+function AnalyticsTab({auth}){
+  const [businesses,setBusinesses]=React.useState([]);
+  const [bizFilter,setBiz]=React.useState('');
+  const [days,setDays]=React.useState(14);
+  const [funnel,setFunnel]=React.useState(null);
+  const [byDay,setByDay]=React.useState([]);
+  const [words,setWords]=React.useState([]);
+  const [loading,setLoading]=React.useState(false);
+
+  React.useEffect(()=>{
+    fetch(API_BASE+'/api/businesses',{headers:{'X-API-Secret':auth.secret||''}})
+      .then(r=>r.json()).then(d=>setBusinesses(d.businesses||[])).catch(()=>{});
+  },[]);
+
+  React.useEffect(()=>{load();},[bizFilter,days]);
+
+  async function load(){
+    setLoading(true);
+    const p=bizFilter?`&business_id=${bizFilter}`:'';
+    const h={'X-API-Secret':auth.secret||''};
+    try{
+      const [rf,rd,rw]=await Promise.all([
+        fetch(API_BASE+`/api/analytics/funnel?${p}`,{headers:h}).then(r=>r.json()),
+        fetch(API_BASE+`/api/analytics/leads-by-day?days=${days}${p}`,{headers:h}).then(r=>r.json()),
+        fetch(API_BASE+`/api/analytics/trigger-words?${p}`,{headers:h}).then(r=>r.json()),
+      ]);
+      setFunnel(rf.stages||[]);
+      setByDay(Array.isArray(rd)?rd:[]);
+      setWords(Array.isArray(rw)?rw:[]);
+    }catch{}
+    setLoading(false);
+  }
+
+  // ── SVG Bar Chart (leads by day) ───────────────────────────────────────────
+  function LeadsByDayChart(){
+    if(!byDay.length) return <div style={{textAlign:'center',padding:32,color:'var(--ink-4)'}}>Нет данных за выбранный период</div>;
+    const W=800,H=180,PL=36,PR=16,PT=10,PB=36;
+    const cw=W-PL-PR, ch=H-PT-PB;
+    const maxV=Math.max(...byDay.map(d=>d.count),1);
+    const barW=Math.max(4,Math.floor(cw/byDay.length)-3);
+    const yTicks=[0,Math.round(maxV/2),maxV];
+
+    return(
+      <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',height:'auto',display:'block'}}>
+        {/* grid lines */}
+        {yTicks.map(v=>{
+          const y=PT+ch-(v/maxV)*ch;
+          return <g key={v}>
+            <line x1={PL} x2={W-PR} y1={y} y2={y} stroke="var(--line)" strokeWidth="1"/>
+            <text x={PL-6} y={y+4} textAnchor="end" fontSize="10" fill="var(--ink-4)">{v}</text>
+          </g>;
+        })}
+        {/* bars */}
+        {byDay.map((d,i)=>{
+          const bh=Math.max(2,(d.count/maxV)*ch);
+          const x=PL+i*(cw/byDay.length)+(cw/byDay.length-barW)/2;
+          const y=PT+ch-bh;
+          const lbl=d.day.slice(5).replace('-','.');
+          const showLbl=byDay.length<=14||(i%(Math.ceil(byDay.length/14))===0);
+          return <g key={d.day}>
+            <rect x={x} y={y} width={barW} height={bh} rx="3" fill="#16a34a" opacity=".85"/>
+            {d.count>0&&<text x={x+barW/2} y={y-4} textAnchor="middle" fontSize="9.5" fill="var(--ink-3)">{d.count}</text>}
+            {showLbl&&<text x={x+barW/2} y={H-4} textAnchor="middle" fontSize="9.5" fill="var(--ink-4)">{lbl}</text>}
+          </g>;
+        })}
+        {/* axes */}
+        <line x1={PL} x2={PL} y1={PT} y2={PT+ch} stroke="var(--line)" strokeWidth="1"/>
+        <line x1={PL} x2={W-PR} y1={PT+ch} y2={PT+ch} stroke="var(--line)" strokeWidth="1"/>
+      </svg>
+    );
+  }
+
+  // ── Funnel ─────────────────────────────────────────────────────────────────
+  function FunnelChart(){
+    if(!funnel||!funnel.length) return <div style={{textAlign:'center',padding:32,color:'var(--ink-4)'}}>Нет данных</div>;
+    const max=funnel[0]?.value||1;
+    return(
+      <div style={{display:'flex',flexDirection:'column',gap:10,padding:'4px 0'}}>
+        {funnel.map((s,i)=>{
+          const pct=max>0?Math.round((s.value/max)*100):0;
+          const conv=i>0&&funnel[i-1].value>0?Math.round((s.value/funnel[i-1].value)*100):null;
+          return(
+            <div key={s.label}>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:5}}>
+                <span style={{fontSize:12,fontWeight:600,color:'var(--ink-2)'}}>{s.label}</span>
+                <div style={{display:'flex',alignItems:'center',gap:8}}>
+                  {conv!==null&&<span style={{fontSize:11,color:'var(--ink-4)'}}>↓ {conv}%</span>}
+                  <span className="mono" style={{fontSize:13,fontWeight:700,color:'var(--ink)',minWidth:32,textAlign:'right'}}>{s.value}</span>
+                </div>
+              </div>
+              <div style={{height:10,background:'var(--line)',borderRadius:99,overflow:'hidden'}}>
+                <div style={{height:'100%',width:`${pct}%`,background:s.color,borderRadius:99,transition:'width .4s ease'}}/>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // ── Trigger Words ──────────────────────────────────────────────────────────
+  function TriggerWordsChart(){
+    if(!words.length) return <div style={{textAlign:'center',padding:32,color:'var(--ink-4)'}}>Нет данных</div>;
+    const max=words[0]?.count||1;
+    const colors=['#ef4444','#f97316','#f59e0b','#10b981','#06b6d4','#6366f1','#8b5cf6','#ec4899','#14b8a6','#84cc16'];
+    return(
+      <div style={{display:'flex',flexDirection:'column',gap:9}}>
+        {words.map((w,i)=>{
+          const pct=Math.round((w.count/max)*100);
+          return(
+            <div key={w.word} style={{display:'flex',alignItems:'center',gap:10}}>
+              <span style={{fontSize:11,fontWeight:600,color:'var(--ink-2)',width:110,flexShrink:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{w.word}</span>
+              <div style={{flex:1,height:9,background:'var(--line)',borderRadius:99,overflow:'hidden'}}>
+                <div style={{height:'100%',width:`${pct}%`,background:colors[i%colors.length],borderRadius:99,transition:'width .4s ease'}}/>
+              </div>
+              <span className="mono" style={{fontSize:11,fontWeight:700,color:'var(--ink-3)',minWidth:24,textAlign:'right'}}>{w.count}</span>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  const card=(title,children,fullWidth=false)=>(
+    <div style={{background:'var(--bg-card)',border:'1px solid var(--line)',borderRadius:'var(--radius)',boxShadow:'var(--shadow)',overflow:'hidden',gridColumn:fullWidth?'1/-1':'auto'}}>
+      <div style={{padding:'14px 18px',borderBottom:'1px solid var(--line)',fontWeight:650,fontSize:13.5,letterSpacing:'-.01em'}}>{title}</div>
+      <div style={{padding:18}}>{loading?<div className="spinner-wrap"><div className="spinner"/></div>:children}</div>
+    </div>
+  );
+
+  return(
+    <div>
+      <div className="filters-bar" style={{marginBottom:20}}>
+        <div className="filter-group">
+          <span className="filter-label">Бизнес</span>
+          <select className="filter-select" value={bizFilter} onChange={e=>setBiz(e.target.value)}>
+            <option value="">Все бизнесы</option>
+            {businesses.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
+          </select>
+        </div>
+        <div className="filter-group">
+          <span className="filter-label">График за</span>
+          <div className="seg" style={{height:34,alignItems:'center'}}>
+            {[[7,'7 дн.'],[14,'14 дн.'],[30,'30 дн.']].map(([v,l])=>(
+              <button key={v} className={days===v?'on':''} onClick={()=>setDays(v)} style={{padding:'3px 12px'}}>{l}</button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:16}}>
+        {card('📊 Воронка конверсии',<FunnelChart/>)}
+        {card('🎯 Топ триггерных слов',<TriggerWordsChart/>)}
+      </div>
+      {card('📈 Лиды по дням',<LeadsByDayChart/>,true)}
+    </div>
+  );
+}
+
 // ── Bookings Tab ──────────────────────────────────────────────────────────────
 function BookingsTab({auth}){
   const [bookings,setBookings]=React.useState([]);
@@ -938,10 +1098,11 @@ function AdminPlatform({auth,onLogout}){
         {tab==='overview'  &&<OverviewTab  auth={auth} period={period} bizFilter={bizFilter==='all'?'':bizFilter}/>}
         {tab==='leads'     &&<LeadsTab     auth={auth}/>}
         {tab==='bookings'  &&<BookingsTab  auth={auth}/>}
-        {(tab==='analytics'||tab==='settings')&&(
+        {tab==='analytics' &&<AnalyticsTab auth={auth}/>}
+        {tab==='settings'&&(
           <div className="coming-card">
-            <div className="coming-icon">{tab==='analytics'?'📊':'⚙️'}</div>
-            <div className="coming-title">{tab==='analytics'?'Аналитика':'Настройки'}</div>
+            <div className="coming-icon">⚙️</div>
+            <div className="coming-title">Настройки</div>
             <div className="coming-sub">Этот раздел появится в следующей версии.</div>
             <span className="coming-badge">Скоро</span>
           </div>
