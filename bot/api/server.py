@@ -609,7 +609,6 @@ async def _reload_bots():
 
 def create_app() -> web.Application:
     app = web.Application()
-    app.router.add_route("OPTIONS", "/{path_info:.*}", handle_options)
 
     # Dashboard
     app.router.add_get("/", serve_dashboard)
@@ -649,5 +648,8 @@ def create_app() -> web.Application:
 
     # Utils
     app.router.add_post("/api/reload", reload_bots)
+
+    # OPTIONS после всех маршрутов чтобы не перехватывал GET
+    app.router.add_route("OPTIONS", "/{path_info:.*}", handle_options)
 
     return app
