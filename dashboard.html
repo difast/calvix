@@ -762,6 +762,175 @@ function LeadsTab({ auth }) {
   );
 }
 
+// ── Bookings Tab ───────────────────────────────────────────────────────────────
+function BookingsTab({ auth }) {
+  const [bookings, setBookings]     = React.useState([]);
+  const [loading, setLoading]       = React.useState(false);
+  const [businesses, setBusinesses] = React.useState([]);
+  const [filters, setFilters]       = React.useState({ business_id: '', status: '' });
+  const [pendingFilters, setPending] = React.useState({ business_id: '', status: '' });
+
+  React.useEffect(() => {
+    fetch(API_BASE + '/api/businesses', { headers: { 'X-API-Secret': auth.secret || '' } })
+      .then(r => r.json()).then(d => setBusinesses(d.businesses || [])).catch(() => {});
+  }, []);
+
+  React.useEffect(() => { loadBookings(); }, [filters]);
+
+  async function loadBookings() {
+    setLoading(true);
+    const params = new URLSearchParams();
+    if (filters.business_id) params.append('business_id', filters.business_id);
+    if (filters.status)      params.append('status', filters.status);
+    try {
+      const r = await fetch(API_BASE + '/api/bookings?' + params, { headers: { 'X-API-Secret': auth.secret || '' } });
+      const d = await r.json();
+      setBookings(Array.isArray(d) ? d : []);
+    } catch {}
+    setLoading(false);
+  }
+
+  async function changeStatus(id, status) {
+    await fetch(API_BASE + `/api/bookings/${id}/status`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'X-API-Secret': auth.secret || '' },
+      body: JSON.stringify({ status })
+    });
+    setBookings(prev => prev.map(b => b.id === id ? { ...b, status } : b));
+  }
+
+  function applyFilters() { setFilters({ ...pendingFilters }); }
+  function resetFilters() { const e = { business_id: '', status: '' }; setPending(e); setFilters(e); }
+
+  const statusInfo = {
+    pending:   { label: 'Ожидает',    cls: 'badge-warm' },
+    done:      { label: 'Проведён',   cls: 'badge-cold' },
+    cancelled: { label: 'Отменён',    cls: 'badge-hot'  },
+  };
+
+  const counts = {
+    total:     bookings.length,
+    pending:   bookings.filter(b => b.status === 'pending').length,
+    done:      bookings.filter(b => b.status === 'done').length,
+    cancelled: bookings.filter(b => b.status === 'cancelled').length,
+  };
+
+  return (
+    <div>
+      <div style={{display:'flex', gap:12, marginBottom:20}}>
+        {[
+          { label:'Всего',      val: counts.total,     color:'var(--ink)' },
+          { label:'Ожидает',    val: counts.pending,   color:'#d48806' },
+          { label:'Проведено',  val: counts.done,      color:'var(--accent)' },
+          { label:'Отменено',   val: counts.cancelled, color:'var(--danger)' },
+        ].map(s => (
+          <div key={s.label} style={{
+            background:'var(--bg-card)', border:'1px solid var(--line)',
+            borderRadius:'var(--radius)', padding:'14px 20px',
+            boxShadow:'var(--shadow)', flex:1, textAlign:'center'
+          }}>
+            <div style={{fontSize:26, fontWeight:700, color:s.color}}>{s.val}</div>
+            <div style={{fontSize:12, color:'var(--ink-3)', marginTop:2}}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="filters-bar">
+        <div className="filter-group">
+          <span className="filter-label">Бизнес</span>
+          <select className="filter-select" value={pendingFilters.business_id}
+            onChange={e => setPending(p => ({ ...p, business_id: e.target.value }))}>
+            <option value="">Все бизнесы</option>
+            {businesses.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </select>
+        </div>
+        <div className="filter-group">
+          <span className="filter-label">Статус</span>
+          <select className="filter-select" value={pendingFilters.status}
+            onChange={e => setPending(p => ({ ...p, status: e.target.value }))}>
+            <option value="">Все</option>
+            <option value="pending">⏳ Ожидает</option>
+            <option value="done">✅ Проведён</option>
+            <option value="cancelled">❌ Отменён</option>
+          </select>
+        </div>
+        <div className="filters-actions">
+          <button className="btn btn-primary btn-sm" onClick={applyFilters}>Применить</button>
+          <button className="btn btn-ghost btn-sm" onClick={resetFilters}>Сбросить</button>
+        </div>
+      </div>
+
+      <div className="table-wrap">
+        {loading ? (
+          <div className="spinner-wrap"><div className="spinner" /><span>Загрузка...</span></div>
+        ) : bookings.length === 0 ? (
+          <div className="table-empty">Записей на созвон нет</div>
+        ) : (
+          <table className="table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Клиент</th>
+                <th>Бизнес</th>
+                <th>Телефон</th>
+                <th>Дата и время созвона</th>
+                <th>Создан</th>
+                <th>Статус</th>
+                <th>Действие</th>
+              </tr>
+            </thead>
+            <tbody>
+              {bookings.map(b => {
+                const si = statusInfo[b.status] || statusInfo.pending;
+                return (
+                  <tr key={b.id}>
+                    <td style={{color:'var(--ink-3)'}}>{b.id}</td>
+                    <td>
+                      <div style={{fontWeight:600}}>{b.full_name || '—'}</div>
+                      {b.username && <div style={{color:'var(--ink-3)',fontSize:12}}>@{b.username}</div>}
+                    </td>
+                    <td style={{color:'var(--ink-2)'}}>{b.business_name || '—'}</td>
+                    <td style={{color:'var(--ink-3)'}}>{b.phone || '—'}</td>
+                    <td>
+                      {b.scheduled_at
+                        ? <span style={{fontWeight:600, color:'var(--ink)'}}>{fmtDate(b.scheduled_at)}</span>
+                        : <span style={{color:'var(--ink-4)'}}>не указано</span>}
+                    </td>
+                    <td style={{color:'var(--ink-3)'}}>{fmtDate(b.created_at)}</td>
+                    <td><span className={`badge ${si.cls}`}>{si.label}</span></td>
+                    <td>
+                      {b.status === 'pending' && (
+                        <div style={{display:'flex', gap:6}}>
+                          <button className="btn btn-primary btn-sm"
+                            style={{background:'var(--accent)', fontSize:11}}
+                            onClick={() => changeStatus(b.id, 'done')}>
+                            ✅ Проведён
+                          </button>
+                          <button className="btn btn-ghost btn-sm"
+                            style={{color:'var(--danger)', borderColor:'var(--danger-line)', fontSize:11}}
+                            onClick={() => changeStatus(b.id, 'cancelled')}>
+                            ❌ Отменить
+                          </button>
+                        </div>
+                      )}
+                      {b.status !== 'pending' && (
+                        <button className="btn btn-ghost btn-sm" style={{fontSize:11}}
+                          onClick={() => changeStatus(b.id, 'pending')}>
+                          ↩ Вернуть
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Admin Platform ─────────────────────────────────────────────────────────────
 function AdminPlatform({ auth, onLogout }) {
   const [tab, setTab] = React.useState('leads');
@@ -800,13 +969,12 @@ function AdminPlatform({ auth, onLogout }) {
           ))}
         </div>
 
-        {tab === 'leads' && <LeadsTab auth={auth} />}
-        {tab !== 'leads' && (
+        {tab === 'leads'    && <LeadsTab auth={auth} />}
+        {tab === 'bookings' && <BookingsTab auth={auth} />}
+        {(tab === 'analytics' || tab === 'settings') && (
           <div className="coming-card">
-            <div className="coming-icon">{tab === 'bookings' ? '📅' : tab === 'analytics' ? '📊' : '⚙️'}</div>
-            <div className="coming-title">
-              {tab === 'bookings' ? 'Бронирования' : tab === 'analytics' ? 'Аналитика' : 'Настройки'}
-            </div>
+            <div className="coming-icon">{tab === 'analytics' ? '📊' : '⚙️'}</div>
+            <div className="coming-title">{tab === 'analytics' ? 'Аналитика' : 'Настройки'}</div>
             <div className="coming-sub">Этот раздел появится в следующей версии.</div>
             <span className="coming-badge">Скоро</span>
           </div>

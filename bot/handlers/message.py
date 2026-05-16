@@ -8,31 +8,20 @@ from bot.services.ai_client import AIClient
 from bot.services.sales_agent import SalesAgent
 from bot.services.analytics import analytics
 from bot.services.supabase_sync import supabase_sync
+from bot.services.lead_scoring import LeadScoringService
 from bot.repositories import LeadRepository, MessageRepository
 from bot.config import settings
 
 logger = logging.getLogger(__name__)
 
-HOT_KEYWORDS = [
-    "купить", "записаться", "хочу начать", "сколько стоит",
-    "цена", "стоимость", "оплатить", "запишите", "давайте",
-    "готов", "когда можно", "как записаться", "хочу", "запиши"
-]
-WARM_KEYWORDS = [
-    "интересно", "расскажите", "подробнее",
-    "думаю", "возможно", "наверное"
-]
+_scorer = LeadScoringService()
 
 
-def get_qualification(text: str) -> str | None:
-    t = text.lower()
-    for kw in HOT_KEYWORDS:
-        if kw in t:
-            return "HOT"
-    for kw in WARM_KEYWORDS:
-        if kw in t:
-            return "WARM"
-    return None
+def get_qualification(text: str, history: list) -> str | None:
+    status, score, _ = _scorer.score(text, history)
+    if status == "COLD" and score <= 0:
+        return None
+    return status
 
 
 def get_book_button() -> InlineKeyboardMarkup:
@@ -93,7 +82,7 @@ def create_message_router() -> Router:
             pass
 
         # Квалификация
-        qualification = get_qualification(user_text)
+        qualification = get_qualification(user_text, history)
         logger.info(f"Сообщение от {user_id} в бизнес {business_id}: квалификация={qualification!r}, текст={user_text!r}")
 
         if qualification == "HOT":

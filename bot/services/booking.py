@@ -115,6 +115,7 @@ async def create_booking(lead_id: int, phone: str, scheduled_datetime: str, sche
                 lead_id=lead_id,
                 business_id=business_id,
                 phone=phone,
+                scheduled_at=scheduled_dt,
                 status="pending",
             )
             session.add(booking)

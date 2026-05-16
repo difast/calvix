@@ -33,7 +33,7 @@ def create_callback_router() -> Router:
             )
             return
 
-        await state.update_data(scheduled_datetime=formatted)
+        await state.update_data(scheduled_datetime=formatted, scheduled_dt=dt.isoformat() if dt else None)
         await state.set_state(BookingStates.waiting_for_phone)
         await message.answer(
             f"✅ Записал: {formatted}\n\n"
@@ -77,6 +77,7 @@ def create_callback_router() -> Router:
             state_data = await state.get_data()
             phone = state_data.get("phone")
             scheduled_datetime = state_data.get("scheduled_datetime")
+            scheduled_dt_iso = state_data.get("scheduled_dt")
             lead_id = state_data.get("lead_id")
             business_id = kwargs.get("business_id", 1)
             business = kwargs.get("business")
@@ -86,7 +87,9 @@ def create_callback_router() -> Router:
                 await state.clear()
                 return
 
-            _, message_text = await create_booking(lead_id, phone, scheduled_datetime, None, business_id)
+            from datetime import datetime as dt_cls
+            scheduled_dt = dt_cls.fromisoformat(scheduled_dt_iso) if scheduled_dt_iso else None
+            _, message_text = await create_booking(lead_id, phone, scheduled_datetime, scheduled_dt, business_id)
             await callback.message.answer(message_text)
             await state.clear()
 
