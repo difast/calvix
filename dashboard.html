@@ -359,16 +359,23 @@ const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 const SB_H = {'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`};
 
 async function sbGet(table, params={}){
-  const u=new URL(`${SB_URL}/${table}`);
-  Object.entries(params).forEach(([k,v])=>{
-    if(v==null||v==='') return;
-    if(Array.isArray(v)) v.forEach(vi=>u.searchParams.append(k,vi));
-    else u.searchParams.append(k,v);
-  });
-  const r=await fetch(u,{headers:{...SB_H,'Prefer':'count=exact'}});
-  const count=parseInt(r.headers.get('content-range')?.split('/')[1]||'0');
-  const data=await r.json();
-  return{data:Array.isArray(data)?data:[],count};
+  try{
+    const u=new URL(`${SB_URL}/${table}`);
+    Object.entries(params).forEach(([k,v])=>{
+      if(v==null||v==='') return;
+      if(Array.isArray(v)) v.forEach(vi=>u.searchParams.append(k,vi));
+      else u.searchParams.append(k,v);
+    });
+    const r=await fetch(u,{headers:{...SB_H,'Prefer':'count=exact'}});
+    const cr=r.headers.get('content-range')||'';
+    const count=parseInt((cr.split('/')[1])||'0')||0;
+    const data=await r.json();
+    if(!r.ok){console.error('[SB] Error',table,data?.message||r.status);return{data:[],count:0};}
+    return{data:Array.isArray(data)?data:[],count};
+  }catch(e){
+    console.error('[SB] Fetch error',table,e);
+    return{data:[],count:0};
+  }
 }
 async function sbPatch(table, id, body){
   await fetch(`${SB_URL}/${table}?id=eq.${id}`,{
@@ -542,20 +549,17 @@ function OverviewTab({auth,period,bizFilter}){
   async function load(){
     setLoading(true);
     const dateFrom=period==='today'?todayISO():period==='week'?weekAgo():period==='month'?monthAgo():null;
-    try{
-      const bizQ=bizFilter?`&business_name=eq.${encodeURIComponent(bizFilter)}`:'';
-      const dateQ=dateFrom?`&created_at=gte.${dateFrom}`:'';
-      const [rAll,rHot,rToday,rLeads,rBook]=await Promise.all([
-        sbGet('hot_leads',{select:'id',limit:1,...(bizFilter?{business_name:`eq.${bizFilter}`}:{})}),
-        sbGet('hot_leads',{select:'id',status:'eq.HOT',limit:1,...(bizFilter?{business_name:`eq.${bizFilter}`}:{})}),
-        sbGet('hot_leads',{select:'id',limit:1,...(bizFilter?{business_name:`eq.${bizFilter}`}:{}),'created_at':`gte.${todayISO()}`}),
-        sbGet('hot_leads',{select:'*',status:'eq.HOT',order:'created_at.desc',limit:10,...(bizFilter?{business_name:`eq.${bizFilter}`}:{}),...(dateFrom?{'created_at':`gte.${dateFrom}`}:{})}),
-        sbGet('bookings', {select:'*',order:'created_at.desc',limit:10,...(bizFilter?{business_name:`eq.${bizFilter}`}:{})}),
-      ]);
-      setKpi({total:rAll.count??0, hot:rHot.count??0, bookings:rBook.count??0, today:rToday.count??0});
-      setHotLeads(rLeads.data||[]);
-      setBookings(rBook.data||[]);
-    }catch(e){console.error(e);}
+    const bq=bizFilter?{business_name:`eq.${bizFilter}`}:{};
+    const [rAll,rHot,rToday,rLeads,rBook]=await Promise.all([
+      sbGet('hot_leads',{select:'id',limit:1,...bq}),
+      sbGet('hot_leads',{select:'id',status:'eq.HOT',limit:1,...bq}),
+      sbGet('hot_leads',{select:'id',limit:1,...bq,'created_at':`gte.${todayISO()}`}),
+      sbGet('hot_leads',{select:'*',status:'eq.HOT',order:'created_at.desc',limit:10,...bq,...(dateFrom?{'created_at':`gte.${dateFrom}`}:{})}),
+      sbGet('bookings', {select:'*',order:'created_at.desc',limit:10,...bq}),
+    ]);
+    setKpi({total:rAll.count,hot:rHot.count,bookings:rBook.count,today:rToday.count});
+    setHotLeads(rLeads.data);
+    setBookings(rBook.data);
     setLoading(false);
   }
 

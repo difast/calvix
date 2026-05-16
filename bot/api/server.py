@@ -110,7 +110,16 @@ async def serve_dashboard(request):
     if os.path.exists(DASHBOARD_PATH):
         with open(DASHBOARD_PATH, "r", encoding="utf-8") as f:
             content = f.read()
-        return web.Response(text=content, content_type="text/html", charset="utf-8")
+        return web.Response(
+            text=content,
+            content_type="text/html",
+            charset="utf-8",
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0",
+            },
+        )
     return web.Response(text="<h1>Dashboard not found</h1>", content_type="text/html", status=404)
 
 
