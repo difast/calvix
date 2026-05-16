@@ -358,31 +358,49 @@ const SB_URL = 'https://mvhivbqfgteregyhmlhf.supabase.co/rest/v1';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im12aGl2YnFmZ3RlcmVneWhtbGhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3ODY4NzUsImV4cCI6MjA5NDM2Mjg3NX0.VOfoL-ZO5sNNu9GAEuGPelMOIEqLRSzgqsuzSkVCt1E';
 const SB_H = {'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`};
 
+function _sbUrl(table, params){
+  const u=new URL(`${SB_URL}/${table}`);
+  Object.entries(params).forEach(([k,v])=>{
+    if(v==null||v==='') return;
+    if(Array.isArray(v)) v.forEach(vi=>u.searchParams.append(k,vi));
+    else u.searchParams.append(k,String(v));
+  });
+  return u;
+}
 async function sbGet(table, params={}){
   try{
-    const u=new URL(`${SB_URL}/${table}`);
-    Object.entries(params).forEach(([k,v])=>{
-      if(v==null||v==='') return;
-      if(Array.isArray(v)) v.forEach(vi=>u.searchParams.append(k,vi));
-      else u.searchParams.append(k,v);
-    });
-    const r=await fetch(u,{headers:{...SB_H,'Prefer':'count=exact'}});
-    const cr=r.headers.get('content-range')||'';
-    const count=parseInt((cr.split('/')[1])||'0')||0;
+    const r=await fetch(_sbUrl(table,params),{headers:SB_H});
     const data=await r.json();
-    if(!r.ok){console.error('[SB] Error',table,data?.message||r.status);return{data:[],count:0};}
-    return{data:Array.isArray(data)?data:[],count};
-  }catch(e){
-    console.error('[SB] Fetch error',table,e);
-    return{data:[],count:0};
-  }
+    if(!r.ok){console.error('[SB] Error',table,r.status,data?.message||data);return{data:[],count:0};}
+    const arr=Array.isArray(data)?data:[];
+    return{data:arr,count:arr.length};
+  }catch(e){console.error('[SB] Fetch error',table,e);return{data:[],count:0};}
+}
+async function sbCount(table, params={}){
+  try{
+    const r=await fetch(_sbUrl(table,{...params,select:'count'}),{headers:SB_H});
+    const data=await r.json();
+    if(!r.ok){console.error('[SB] Count error',table,r.status,data?.message||data);return 0;}
+    return parseInt(Array.isArray(data)&&data[0]?.count)||0;
+  }catch(e){console.error('[SB] Count fetch error',table,e);return 0;}
+}
+async function sbGetPaged(table, params={}){
+  try{
+    const headers={...SB_H,'Prefer':'count=exact'};
+    const r=await fetch(_sbUrl(table,params),{headers});
+    const data=await r.json();
+    if(!r.ok){console.error('[SB] Paged error',table,r.status,data?.message||data);return{data:[],count:0};}
+    const cr=r.headers.get('content-range')||'';
+    const total=parseInt((cr.split('/')[1])||'0')||0;
+    return{data:Array.isArray(data)?data:[],count:total||data?.length||0};
+  }catch(e){console.error('[SB] Paged fetch error',table,e);return{data:[],count:0};}
 }
 async function sbPatch(table, id, body){
-  await fetch(`${SB_URL}/${table}?id=eq.${id}`,{
-    method:'PATCH',
-    headers:{...SB_H,'Content-Type':'application/json'},
-    body:JSON.stringify(body)
-  });
+  try{
+    await fetch(`${SB_URL}/${table}?id=eq.${id}`,{
+      method:'PATCH',headers:{...SB_H,'Content-Type':'application/json'},body:JSON.stringify(body)
+    });
+  }catch(e){console.error('[SB] Patch error',table,e);}
 }
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
@@ -550,14 +568,15 @@ function OverviewTab({auth,period,bizFilter}){
     setLoading(true);
     const dateFrom=period==='today'?todayISO():period==='week'?weekAgo():period==='month'?monthAgo():null;
     const bq=bizFilter?{business_name:`eq.${bizFilter}`}:{};
-    const [rAll,rHot,rToday,rLeads,rBook]=await Promise.all([
-      sbGet('hot_leads',{select:'id',limit:1,...bq}),
-      sbGet('hot_leads',{select:'id',status:'eq.HOT',limit:1,...bq}),
-      sbGet('hot_leads',{select:'id',limit:1,...bq,'created_at':`gte.${todayISO()}`}),
+    const [cAll,cHot,cToday,cBook,rLeads,rBook]=await Promise.all([
+      sbCount('hot_leads',{...bq}),
+      sbCount('hot_leads',{...bq,status:'eq.HOT'}),
+      sbCount('hot_leads',{...bq,'created_at':`gte.${todayISO()}`}),
+      sbCount('bookings', {...bq}),
       sbGet('hot_leads',{select:'*',status:'eq.HOT',order:'created_at.desc',limit:10,...bq,...(dateFrom?{'created_at':`gte.${dateFrom}`}:{})}),
       sbGet('bookings', {select:'*',order:'created_at.desc',limit:10,...bq}),
     ]);
-    setKpi({total:rAll.count,hot:rHot.count,bookings:rBook.count,today:rToday.count});
+    setKpi({total:cAll,hot:cHot,bookings:cBook,today:cToday});
     setHotLeads(rLeads.data);
     setBookings(rBook.data);
     setLoading(false);
@@ -663,7 +682,7 @@ function LeadsTab({auth}){
     if(filters.date_from) dtArr.push(`gte.${filters.date_from}`);
     if(filters.date_to) dtArr.push(`lte.${filters.date_to}T23:59:59`);
     if(dtArr.length) p['created_at']=dtArr.length===1?dtArr[0]:dtArr;
-    try{const {data,count}=await sbGet('hot_leads',p);setLeads(data);setTotal(count);}catch{}
+    const {data,count}=await sbGetPaged('hot_leads',p);setLeads(data);setTotal(count);
     setLoading(false);
   }
 
@@ -970,7 +989,7 @@ function BookingsTab({auth}){
     setLoading(true);
     const p={select:'*',order:'created_at.desc',limit:200};
     if(filters.business_name) p['business_name']=`eq.${filters.business_name}`;
-    try{const {data}=await sbGet('bookings',p);setBookings(data);}catch{}
+    const {data}=await sbGet('bookings',p);setBookings(data);
     setLoading(false);
   }
 
