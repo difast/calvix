@@ -1,5 +1,5 @@
 from aiogram import Router, F
-from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import CallbackQuery, Message, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
 
 from bot.fsm.booking import BookingStates
@@ -24,7 +24,7 @@ def create_callback_router() -> Router:
         await callback.answer()
 
     @router.message(BookingStates.waiting_for_datetime)
-    async def process_datetime(message: CallbackQuery, state: FSMContext, **kwargs):
+    async def process_datetime(message: Message, state: FSMContext, **kwargs):
         valid, formatted, dt = validate_datetime(message.text)
         if not valid:
             await message.answer(
@@ -41,7 +41,7 @@ def create_callback_router() -> Router:
         )
 
     @router.message(BookingStates.waiting_for_phone)
-    async def process_phone(message: CallbackQuery, state: FSMContext, **kwargs):
+    async def process_phone(message: Message, state: FSMContext, **kwargs):
         valid, phone = validate_phone(message.text)
         if not valid:
             await message.answer(

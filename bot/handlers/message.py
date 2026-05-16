@@ -2,7 +2,7 @@ import logging
 from aiogram import Router, F
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
-from aiogram.filters import StateFilter, Command
+from aiogram.filters import StateFilter
 from bot.fsm.booking import BookingStates
 from bot.services.ai_client import AIClient
 from bot.services.sales_agent import SalesAgent
@@ -18,10 +18,8 @@ _scorer = LeadScoringService()
 
 
 def get_qualification(text: str, history: list) -> str | None:
-    status, score, _ = _scorer.score(text, history)
-    if status == "COLD" and score <= 0:
-        return None
-    return status
+    status, _, _ = _scorer.score(text, history)
+    return None if status == "COLD" else status
 
 
 def get_book_button() -> InlineKeyboardMarkup:
@@ -72,7 +70,7 @@ def create_message_router() -> Router:
             except Exception as e:
                 logger.error(f"Ошибка сохранения сообщений: {e}")
 
-        # FSM для записи на созвон
+        # FSM: передаём lead_id для записи на созвон
         await state.update_data(lead_id=lead_id, business_id=business_id)
 
         # Трекинг
@@ -83,22 +81,14 @@ def create_message_router() -> Router:
 
         # Квалификация
         qualification = get_qualification(user_text, history)
-        logger.info(f"Сообщение от {user_id} в бизнес {business_id}: квалификация={qualification!r}, текст={user_text!r}")
+        logger.info(f"[{business_name}] {user_id}: квалификация={qualification!r}, текст={user_text!r}")
 
         if qualification == "HOT":
             try:
-                # Обновляем статус
                 if lead_id:
                     await lead_repo.update_status(lead_id, "HOT")
+                await analytics.track("qualification_changed", business_id, lead_id, {"status": "HOT", "trigger": user_text[:100]})
 
-                try:
-                    await analytics.track("qualification_changed", business_id, lead_id, {
-                        "status": "HOT", "trigger": user_text[:100]
-                    })
-                except Exception:
-                    pass
-
-                # Получаем данные лида
                 lead = None
                 if lead_id:
                     try:
@@ -109,9 +99,12 @@ def create_message_router() -> Router:
                 client_name = (lead.full_name if lead else None) or full_name or "Неизвестно"
                 client_username = (lead.username if lead else None) or username or "нет"
                 client_phone = (lead.phone if lead else None) or ""
-                trigger_word = next((kw for kw in HOT_KEYWORDS if kw in user_text.lower()), "")
 
-                logger.info(f"HOT ЛИД: бизнес={business_name}, клиент={client_name}, trigger={trigger_word!r}")
+                # Находим триггерное слово
+                text_lower = user_text.lower()
+                trigger_word = next((kw for kw in _scorer.HOT_KEYWORDS if kw in text_lower), "")
+
+                logger.info(f"🔥 HOT ЛИД: бизнес={business_name}, клиент={client_name}, trigger={trigger_word!r}")
 
                 # Уведомление админу
                 for admin_id in settings.admin_ids:
@@ -124,11 +117,10 @@ def create_message_router() -> Router:
                             f"Username: @{client_username}\n"
                             f"Написал: {user_text}"
                         )
-                        logger.info(f"HOT уведомление отправлено admin {admin_id}")
                     except Exception as e:
-                        logger.error(f"Ошибка HOT уведомления admin {admin_id}: {e}")
+                        logger.error(f"Ошибка уведомления admin {admin_id}: {e}")
 
-                # Supabase
+                # Синхронизация с Supabase
                 try:
                     await supabase_sync.push_hot_lead(
                         business_id=business_id,
@@ -156,10 +148,7 @@ def create_message_router() -> Router:
             except Exception as e:
                 logger.error(f"Ошибка WARM блока: {e}")
 
-            if len(history) >= 4:
-                await message.answer(ai_response, reply_markup=get_book_button())
-            else:
-                await message.answer(ai_response)
+            await message.answer(ai_response, reply_markup=get_book_button())
 
         else:
             await message.answer(ai_response)

@@ -3,65 +3,42 @@ from typing import List, Tuple
 
 
 class LeadScoringService:
-    # Ключевые слова для разных статусов
     HOT_KEYWORDS = [
         "купить", "цена", "оплатить", "договор", "счет", "покупка",
-        "хочу заказать", "нужен срочно", "когда внедрите", "записаться",
-        "созвон", "встретиться", "позвоните", "демо", "покажите"
+        "хочу заказать", "нужен срочно", "записаться", "хочу записаться",
+        "созвон", "встретиться", "позвоните", "демо", "покажите",
+        "запишите", "запись", "хочу попробовать", "когда можно начать",
+        "как записаться", "хочу начать", "готов начать", "оформить",
     ]
-    
+
     WARM_KEYWORDS = [
         "интересно", "расскажите", "как работает", "пример",
         "сравнение", "стоимость", "есть ли скидка", "возможно ли",
-        "автоматизация", "бот", "ai"
+        "автоматизация", "хочу узнать", "подробнее", "а если",
+        "сколько стоит", "какая цена", "что входит", "расскажи",
     ]
-    
+
     COLD_KEYWORDS = [
-        "не надо", "отказаться", "не интересно", "потом", "не сейчас",
-        "не нужно", "отпишитесь", "спам"
+        "не надо", "не интересно", "потом", "не сейчас",
+        "не нужно", "отпишитесь", "спам", "отказаться",
     ]
-    
+
     def score(self, message_text: str, history: List[dict]) -> Tuple[str, int, List[str]]:
-        """
-        Возвращает (статус, счет, список причин)
-        """
-        score = 0
-        reasons = []
-        
-        # Проверяем HOT ключевые слова
-        for kw in self.HOT_KEYWORDS:
-            if re.search(kw, message_text, re.IGNORECASE):
-                score += 3
-                reasons.append(f"hot_keyword:{kw}")
-        
-        # Проверяем WARM ключевые слова
-        for kw in self.WARM_KEYWORDS:
-            if re.search(kw, message_text, re.IGNORECASE):
-                score += 1
-                reasons.append(f"warm_keyword:{kw}")
-        
-        # Проверяем COLD ключевые слова (отрицательные сигналы)
+        text = message_text.lower()
+
+        # COLD — отрицательный сигнал, проверяем первым
         for kw in self.COLD_KEYWORDS:
-            if re.search(kw, message_text, re.IGNORECASE):
-                score -= 3
-                reasons.append(f"negative:{kw}")
-        
-        # Длина сообщения (вовлеченность)
-        if len(message_text) > 100:
-            score += 1
-            reasons.append("long_message")
-        
-        # Вопросительные знаки (интерес)
-        if message_text.count('?') >= 2:
-            score += 1
-            reasons.append("multiple_questions")
-        
-        # Определяем статус
-        if score >= 5:
-            status = "HOT"
-        elif score >= 2:
-            status = "WARM"
-        else:
-            status = "COLD"
-        
-        return status, score, reasons
+            if re.search(re.escape(kw), text, re.IGNORECASE):
+                return "COLD", -1, [f"cold:{kw}"]
+
+        # HOT — любое совпадение сразу HOT
+        for kw in self.HOT_KEYWORDS:
+            if re.search(re.escape(kw), text, re.IGNORECASE):
+                return "HOT", 3, [f"hot:{kw}"]
+
+        # WARM — любое совпадение сразу WARM
+        for kw in self.WARM_KEYWORDS:
+            if re.search(re.escape(kw), text, re.IGNORECASE):
+                return "WARM", 1, [f"warm:{kw}"]
+
+        return "COLD", 0, []
