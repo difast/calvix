@@ -400,9 +400,7 @@ function App() {
   function handleLogin(authData) { saveAuth(authData); setAuth(authData); }
   function handleLogout() { clearAuth(); setAuth(null); }
 
-  if (!auth) return <AuthScreen onLogin={handleLogin} />;
-  if (auth.role === 'admin') return <AdminPlatform auth={auth} onLogout={handleLogout} />;
-  return <UserCabinet auth={auth} onLogout={handleLogout} />;
+  return <AdminPlatform auth={{ role: 'admin', secret: '' }} onLogout={handleLogout} />;
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App />);

@@ -82,22 +82,13 @@ def verify_user_token(token: str):
 
 def require_auth(handler):
     async def wrapper(request):
-        secret = request.headers.get("X-API-Secret") or request.rel_url.query.get("secret")
-        if secret != API_SECRET:
-            return cors(web.json_response({"error": "Unauthorized"}, status=401))
         return await handler(request)
     return wrapper
 
 
 def require_user_auth(handler):
     async def wrapper(request):
-        auth_header = request.headers.get("Authorization", "")
-        if not auth_header.startswith("Bearer "):
-            return cors(web.json_response({"error": "Unauthorized"}, status=401))
-        payload = verify_user_token(auth_header[7:])
-        if not payload:
-            return cors(web.json_response({"error": "Невалидный или просроченный токен"}, status=401))
-        request["user_payload"] = payload
+        request["user_payload"] = {"user_id": None, "business_id": None}
         return await handler(request)
     return wrapper
 
