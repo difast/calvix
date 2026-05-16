@@ -10,6 +10,7 @@
 <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" crossorigin="anonymous"></script>
 <style>
 :root {
   --header-bg:   #0d2b1f;
@@ -84,7 +85,25 @@ html, body {
 .logout-btn:hover { background: rgba(239,68,68,.15); color: #fca5a5; border-color: rgba(239,68,68,.3); }
 
 /* Page */
-.page { max-width: 1280px; margin: 0 auto; padding: 48px 28px; }
+.page { max-width: 1280px; margin: 0 auto; padding: 32px 28px; flex: 1; }
+
+/* Nav tabs */
+.nav-tabs {
+  display: flex; gap: 4px; margin-bottom: 28px;
+  background: var(--bg-card); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 5px; width: fit-content;
+  box-shadow: var(--shadow);
+}
+.nav-tab {
+  padding: 7px 18px; border-radius: 8px; font: inherit; font-size: 13px; font-weight: 500;
+  background: transparent; border: 0; color: var(--ink-3); cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.nav-tab:hover { background: var(--bg-page); color: var(--ink-2); }
+.nav-tab.active {
+  background: var(--accent); color: #fff;
+  box-shadow: 0 2px 8px var(--accent-glow);
+}
 
 /* Coming soon card */
 .coming-card {
@@ -102,6 +121,165 @@ html, body {
   border: 1px solid rgba(26,107,60,.2);
 }
 
+/* Buttons */
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: var(--radius-sm); font: inherit; font-size: 13px; font-weight: 600; border: 0; cursor: pointer; transition: opacity .15s, background .15s; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn-primary { background: var(--accent); color: #fff; box-shadow: 0 2px 8px var(--accent-glow); }
+.btn-primary:hover:not(:disabled) { opacity: .88; }
+.btn-ghost { background: var(--bg-card); border: 1px solid var(--line); color: var(--ink-2); }
+.btn-ghost:hover:not(:disabled) { background: var(--bg-page); }
+.btn-sm { padding: 5px 10px; font-size: 12px; }
+
+/* Filters bar */
+.filters-bar {
+  display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;
+  background: var(--bg-card); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 16px 20px; margin-bottom: 16px;
+  box-shadow: var(--shadow);
+}
+.filter-group { display: flex; flex-direction: column; gap: 4px; }
+.filter-label { font-size: 11px; font-weight: 600; color: var(--ink-3); text-transform: uppercase; letter-spacing: .05em; }
+.filter-input, .filter-select {
+  height: 34px; padding: 0 10px; border-radius: var(--radius-sm);
+  border: 1px solid var(--line); background: var(--bg-page); color: var(--ink);
+  font: inherit; font-size: 13px; outline: none; min-width: 140px;
+  transition: border-color .15s;
+}
+.filter-input:focus, .filter-select:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(26,107,60,.1); }
+.filters-actions { display: flex; gap: 8px; margin-left: auto; align-items: flex-end; }
+
+/* Export buttons */
+.export-row { display: flex; gap: 8px; margin-bottom: 16px; align-items: center; }
+.export-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 6px 12px; border-radius: 6px; font: inherit; font-size: 12px; font-weight: 600;
+  border: 1px solid var(--line); cursor: pointer; background: var(--bg-card);
+  color: var(--ink-2); transition: background .15s;
+}
+.export-btn:hover { background: var(--bg-page); }
+.export-csv  { border-color: #86efac; color: #166534; background: #f0fdf4; }
+.export-csv:hover  { background: #dcfce7; }
+.export-xlsx { border-color: #93c5fd; color: #1e40af; background: #eff6ff; }
+.export-xlsx:hover { background: #dbeafe; }
+.export-pdf  { border-color: #fca5a5; color: #991b1b; background: #fff5f5; }
+.export-pdf:hover  { background: #fee2e2; }
+.leads-count { font-size: 12px; color: var(--ink-3); margin-left: auto; }
+
+/* Table */
+.table-wrap {
+  background: var(--bg-card); border: 1px solid var(--line);
+  border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden;
+}
+.table { width: 100%; border-collapse: collapse; }
+.table th {
+  background: var(--bg-page); padding: 10px 14px;
+  text-align: left; font-size: 11px; font-weight: 700;
+  color: var(--ink-3); text-transform: uppercase; letter-spacing: .05em;
+  border-bottom: 1px solid var(--line); white-space: nowrap;
+}
+.table td {
+  padding: 11px 14px; border-bottom: 1px solid var(--line);
+  vertical-align: middle; font-size: 13px;
+}
+.table tr:last-child td { border-bottom: 0; }
+.table tr.clickable { cursor: pointer; transition: background .1s; }
+.table tr.clickable:hover td { background: #f7faf8; }
+.table-empty { text-align: center; padding: 48px; color: var(--ink-3); font-size: 14px; }
+
+/* Status badges */
+.badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 700;
+  white-space: nowrap;
+}
+.badge-hot  { background: #fff1f0; color: #cf1322; border: 1px solid #ffa39e; }
+.badge-warm { background: #fffbe6; color: #d48806; border: 1px solid #ffe58f; }
+.badge-cold { background: #f0f9ff; color: #0369a1; border: 1px solid #bae6fd; }
+
+/* Status changer inline */
+.status-btns { display: flex; gap: 4px; }
+.sbtn {
+  padding: 3px 8px; border-radius: 999px; font: inherit; font-size: 11px; font-weight: 700;
+  border: 1px solid transparent; cursor: pointer; transition: opacity .15s;
+  opacity: .4;
+}
+.sbtn.active { opacity: 1; }
+.sbtn:hover { opacity: .85; }
+.sbtn-hot  { background: #fff1f0; color: #cf1322; border-color: #ffa39e; }
+.sbtn-warm { background: #fffbe6; color: #d48806; border-color: #ffe58f; }
+.sbtn-cold { background: #f0f9ff; color: #0369a1; border-color: #bae6fd; }
+
+/* Pagination */
+.pagination {
+  display: flex; align-items: center; gap: 8px; justify-content: flex-end;
+  padding: 14px 20px; border-top: 1px solid var(--line);
+}
+.page-btn {
+  width: 30px; height: 30px; border-radius: 6px; font: inherit; font-size: 12px; font-weight: 600;
+  background: var(--bg-page); border: 1px solid var(--line); cursor: pointer;
+  display: grid; place-items: center; color: var(--ink-2); transition: background .1s;
+}
+.page-btn:hover:not(:disabled) { background: var(--line); }
+.page-btn:disabled { opacity: .4; cursor: not-allowed; }
+.page-btn.current { background: var(--accent); color: #fff; border-color: var(--accent); }
+.page-info { font-size: 12px; color: var(--ink-3); }
+
+/* Loading spinner */
+.spinner-wrap { display: flex; align-items: center; justify-content: center; padding: 48px; gap: 10px; color: var(--ink-3); }
+.spinner {
+  width: 20px; height: 20px; border-radius: 50%;
+  border: 2px solid var(--line); border-top-color: var(--accent);
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Modal */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(13,43,31,.45);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 100; padding: 20px;
+  animation: fadeIn .15s ease;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.modal {
+  background: var(--bg-card); border-radius: var(--radius);
+  box-shadow: var(--shadow-lg); width: 100%; max-width: 620px;
+  max-height: 85vh; display: flex; flex-direction: column;
+  animation: slideUp .2s ease;
+}
+@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.modal-hd {
+  padding: 20px 24px 16px; border-bottom: 1px solid var(--line);
+  display: flex; align-items: flex-start; gap: 14px;
+}
+.modal-hd-info { flex: 1; min-width: 0; }
+.modal-hd-name { font-size: 16px; font-weight: 700; color: var(--ink); }
+.modal-hd-meta { font-size: 12px; color: var(--ink-3); margin-top: 2px; }
+.modal-close {
+  width: 28px; height: 28px; border-radius: 6px; font: inherit; font-size: 16px;
+  background: var(--bg-page); border: 1px solid var(--line); cursor: pointer;
+  color: var(--ink-3); display: grid; place-items: center; flex-shrink: 0;
+}
+.modal-close:hover { background: var(--danger-lt); color: var(--danger); border-color: var(--danger-line); }
+.modal-status { padding: 14px 24px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 12px; }
+.modal-status-label { font-size: 12px; font-weight: 600; color: var(--ink-3); text-transform: uppercase; letter-spacing: .05em; }
+.modal-body { flex: 1; overflow-y: auto; padding: 16px 24px; }
+.modal-ft { padding: 14px 24px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; }
+
+/* Chat messages */
+.chat-list { display: flex; flex-direction: column; gap: 10px; }
+.chat-msg { display: flex; flex-direction: column; max-width: 82%; }
+.chat-msg.user { align-self: flex-end; align-items: flex-end; }
+.chat-msg.assistant { align-self: flex-start; align-items: flex-start; }
+.chat-bubble {
+  padding: 9px 13px; border-radius: 12px; font-size: 13px; line-height: 1.55;
+  white-space: pre-wrap; word-break: break-word;
+}
+.chat-msg.user .chat-bubble { background: var(--accent); color: #fff; border-bottom-right-radius: 3px; }
+.chat-msg.assistant .chat-bubble { background: var(--bg-page); border: 1px solid var(--line); color: var(--ink); border-bottom-left-radius: 3px; }
+.chat-time { font-size: 10.5px; color: var(--ink-4); margin-top: 3px; padding: 0 2px; }
+.chat-empty { text-align: center; padding: 32px; color: var(--ink-3); font-size: 13px; }
+
 /* Auth page */
 .auth-page {
   min-height: 100vh; display: flex; align-items: center; justify-content: center;
@@ -113,9 +291,7 @@ html, body {
   box-shadow: 0 20px 60px rgba(0,0,0,.3);
   width: 100%; max-width: 420px; overflow: hidden;
 }
-.auth-card-hd {
-  background: var(--header-bg); padding: 28px 32px 24px; text-align: center;
-}
+.auth-card-hd { background: var(--header-bg); padding: 28px 32px 24px; text-align: center; }
 .auth-logo-mark {
   width: 52px; height: 52px; border-radius: 13px;
   background: linear-gradient(135deg, var(--accent-lt), var(--accent));
@@ -162,11 +338,12 @@ html, body {
 }
 .field input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(26,107,60,.1); }
 
-/* Buttons */
-.btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 20px; border-radius: var(--radius-sm); font: inherit; font-size: 13px; font-weight: 600; border: 0; cursor: pointer; transition: opacity .15s; }
-.btn:disabled { opacity: .5; cursor: not-allowed; }
-.btn-primary { background: var(--accent); color: #fff; box-shadow: 0 2px 8px var(--accent-glow); }
-.btn-primary:hover:not(:disabled) { opacity: .9; }
+/* Print styles */
+@media print {
+  .header, .nav-tabs, .filters-bar, .export-row, .pagination, .modal-overlay { display: none !important; }
+  .table-wrap { box-shadow: none; border: 1px solid #ccc; }
+  .page { padding: 0; }
+}
 </style>
 </head>
 <body>
@@ -185,53 +362,54 @@ function loadAuth() {
 function saveAuth(auth) { localStorage.setItem(AUTH_KEY, JSON.stringify(auth)); }
 function clearAuth() { localStorage.removeItem(AUTH_KEY); }
 
-// ── Auth Screen ───────────────────────────────────────────────────────────────
+function fmtDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleString('ru', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
+// ── Auth Screen ────────────────────────────────────────────────────────────────
 function AuthScreen({ onLogin }) {
   const [mode, setMode]           = React.useState('login');
-  const [identifier, setIdentifier] = React.useState('');
+  const [val, setVal]             = React.useState('');
   const [password, setPassword]   = React.useState('');
   const [fullName, setFullName]   = React.useState('');
   const [adminPass, setAdminPass] = React.useState('');
+  const [err, setErr]             = React.useState('');
   const [loading, setLoading]     = React.useState(false);
-  const [error, setError]         = React.useState('');
 
-  function switchMode(m) { setMode(m); setError(''); }
+  function switchMode(m) { setMode(m); setErr(''); }
 
-  async function handleUserAuth(e) {
-    e.preventDefault();
-    setError(''); setLoading(true);
+  const isEmail = val.includes('@');
+
+  async function handleUserSubmit(e) {
+    e.preventDefault(); setErr(''); setLoading(true);
     try {
-      const val = identifier.trim();
-      const isEmail = val.includes('@');
       const body = isEmail ? { email: val, password } : { phone: val, password };
-      if (mode === 'register' && fullName.trim()) body.full_name = fullName.trim();
-
+      if (mode === 'register') body.full_name = fullName;
       const res = await fetch(API_BASE + (mode === 'register' ? '/api/auth/register' : '/api/auth/login'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.error || `Ошибка ${res.status}`); return; }
+      if (!res.ok) throw new Error(data.error || 'Ошибка');
       onLogin({ ...data, role: 'user' });
-    } catch { setError('Ошибка соединения с сервером'); }
-    finally { setLoading(false); }
+    } catch (e) { setErr(e.message); }
+    setLoading(false);
   }
 
-  async function handleAdminAuth(e) {
-    e.preventDefault();
-    setError(''); setLoading(true);
+  async function handleAdminSubmit(e) {
+    e.preventDefault(); setErr(''); setLoading(true);
     try {
       const res = await fetch(API_BASE + '/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: adminPass }),
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.error || 'Неверный пароль'); return; }
+      if (!res.ok) throw new Error(data.error || 'Неверный пароль');
       onLogin({ role: 'admin', secret: data.secret });
-    } catch { setError('Ошибка соединения'); }
-    finally { setLoading(false); }
+    } catch (e) { setErr(e.message); }
+    setLoading(false);
   }
 
   return (
@@ -240,72 +418,42 @@ function AuthScreen({ onLogin }) {
         <div className="auth-card-hd">
           <div className="auth-logo-mark">C</div>
           <div className="auth-title">Calvix <em>AI</em></div>
-          <div className="auth-sub">Sales Bot Platform</div>
-          <div className="auth-tabs">
-            {mode !== 'admin'
-              ? <>
-                  <button className={`auth-tab${mode === 'login' ? ' active' : ''}`} onClick={() => switchMode('login')}>Войти</button>
-                  <button className={`auth-tab${mode === 'register' ? ' active' : ''}`} onClick={() => switchMode('register')}>Регистрация</button>
-                </>
-              : <button className="auth-tab active">Администратор</button>
-            }
-          </div>
+          <div className="auth-sub">CRM-платформа для управления продажами</div>
+          {mode !== 'admin' && (
+            <div className="auth-tabs">
+              <button className={`auth-tab${mode === 'login' ? ' active' : ''}`} onClick={() => switchMode('login')}>Войти</button>
+              <button className={`auth-tab${mode === 'register' ? ' active' : ''}`} onClick={() => switchMode('register')}>Регистрация</button>
+            </div>
+          )}
         </div>
-
         <div className="auth-body">
-          {error && <div className="auth-err">⚠ {error}</div>}
-
+          {err && <div className="auth-err">{err}</div>}
           {mode !== 'admin' ? (
-            <form onSubmit={handleUserAuth}>
+            <form onSubmit={handleUserSubmit}>
               {mode === 'register' && (
-                <div className="field">
-                  <label>Имя</label>
-                  <input type="text" placeholder="Иван Иванов" value={fullName} onChange={e => setFullName(e.target.value)} />
-                </div>
+                <div className="field"><label>Имя</label><input type="text" placeholder="Иван Иванов" value={fullName} onChange={e => setFullName(e.target.value)} /></div>
               )}
-              <div className="field">
-                <label>Email или телефон</label>
-                <input
-                  type="text"
-                  placeholder="user@example.com или +7 999 000 00 00"
-                  value={identifier}
-                  onChange={e => setIdentifier(e.target.value)}
-                  required autoComplete="username"
-                />
+              <div className="field"><label>Email или телефон</label><input type="text" placeholder="mail@example.com" value={val} onChange={e => setVal(e.target.value)} required /></div>
+              <div className="field"><label>Пароль</label>
+                <input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)}
+                  autoComplete={mode === 'register' ? 'new-password' : 'current-password'} required />
               </div>
-              <div className="field">
-                <label>Пароль</label>
-                <input
-                  type="password"
-                  placeholder={mode === 'register' ? 'Минимум 6 символов' : '••••••••'}
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  required minLength={6}
-                  autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
-                />
-              </div>
-              <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} disabled={loading}>
-                {loading ? '...' : mode === 'register' ? 'Создать аккаунт' : 'Войти'}
+              <button type="submit" className="btn btn-primary" style={{width:'100%',justifyContent:'center',marginBottom:16}} disabled={loading}>
+                {loading ? 'Загрузка...' : mode === 'register' ? 'Создать аккаунт' : 'Войти'}
               </button>
               <div className="auth-divider"><span>или</span></div>
               <button type="button" className="auth-admin-btn" onClick={() => switchMode('admin')}>
-                🔐 Войти как администратор
+                Войти как администратор →
               </button>
             </form>
           ) : (
-            <form onSubmit={handleAdminAuth}>
-              <div className="field">
-                <label>Пароль администратора</label>
-                <input
-                  type="password" placeholder="••••••••"
-                  value={adminPass} onChange={e => setAdminPass(e.target.value)}
-                  required autoFocus
-                />
+            <form onSubmit={handleAdminSubmit}>
+              <div className="field"><label>Пароль администратора</label>
+                <input type="password" placeholder="••••••••" value={adminPass} onChange={e => setAdminPass(e.target.value)} autoFocus required />
               </div>
-              <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} disabled={loading}>
-                {loading ? '...' : '🔐 Войти'}
+              <button type="submit" className="btn btn-primary" style={{width:'100%',justifyContent:'center',marginBottom:16}} disabled={loading}>
+                {loading ? 'Вход...' : 'Войти как админ'}
               </button>
-              <div className="auth-divider"><span>или</span></div>
               <button type="button" className="auth-admin-btn" onClick={() => switchMode('login')}>
                 ← Войти как пользователь
               </button>
@@ -317,11 +465,361 @@ function AuthScreen({ onLogin }) {
   );
 }
 
-// ── User Cabinet (placeholder) ────────────────────────────────────────────────
+// ── Lead History Modal ─────────────────────────────────────────────────────────
+function LeadHistoryModal({ lead, auth, onClose, onStatusChange }) {
+  const [messages, setMessages] = React.useState([]);
+  const [loading, setLoading]   = React.useState(true);
+  const [status, setStatus]     = React.useState(lead.status || 'COLD');
+  const bodyRef = React.useRef(null);
+
+  React.useEffect(() => {
+    fetch(API_BASE + `/api/leads/${lead.id}/history`, {
+      headers: { 'X-API-Secret': auth.secret || '' }
+    })
+    .then(r => r.json())
+    .then(d => { setMessages(Array.isArray(d) ? d : []); setLoading(false); });
+  }, [lead.id]);
+
+  React.useEffect(() => {
+    if (!loading && bodyRef.current) {
+      bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
+    }
+  }, [loading, messages]);
+
+  async function changeStatus(s) {
+    setStatus(s);
+    await fetch(API_BASE + `/api/leads/${lead.id}/status`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'X-API-Secret': auth.secret || '' },
+      body: JSON.stringify({ status: s })
+    });
+    onStatusChange(lead.id, s);
+  }
+
+  const name = lead.full_name || lead.username || `Лид #${lead.id}`;
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal">
+        <div className="modal-hd">
+          <div className="modal-hd-info">
+            <div className="modal-hd-name">{name}</div>
+            <div className="modal-hd-meta">
+              {lead.username && <>@{lead.username} · </>}
+              {lead.phone && <>{lead.phone} · </>}
+              {lead.business_name} · создан {fmtDate(lead.created_at)}
+            </div>
+          </div>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-status">
+          <span className="modal-status-label">Статус:</span>
+          <div className="status-btns">
+            {['HOT','WARM','COLD'].map(s => (
+              <button key={s} className={`sbtn sbtn-${s.toLowerCase()}${status === s ? ' active' : ''}`}
+                onClick={() => changeStatus(s)}>
+                {s === 'HOT' ? '🔥 HOT' : s === 'WARM' ? '⚡ WARM' : '❄️ COLD'}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="modal-body" ref={bodyRef}>
+          {loading ? (
+            <div className="spinner-wrap"><div className="spinner" /><span>Загрузка диалога...</span></div>
+          ) : messages.length === 0 ? (
+            <div className="chat-empty">История диалога пуста</div>
+          ) : (
+            <div className="chat-list">
+              {messages.map((m, i) => (
+                <div key={i} className={`chat-msg ${m.role === 'user' ? 'user' : 'assistant'}`}>
+                  <div className="chat-bubble">{m.content}</div>
+                  <div className="chat-time">{fmtDate(m.created_at)}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="modal-ft">
+          <button className="btn btn-ghost btn-sm" onClick={onClose}>Закрыть</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Leads Tab ──────────────────────────────────────────────────────────────────
+function LeadsTab({ auth }) {
+  const [leads, setLeads]           = React.useState([]);
+  const [total, setTotal]           = React.useState(0);
+  const [page, setPage]             = React.useState(1);
+  const [loading, setLoading]       = React.useState(false);
+  const [businesses, setBusinesses] = React.useState([]);
+  const [filters, setFilters]       = React.useState({ business_id: '', status: '', date_from: '', date_to: '' });
+  const [pendingFilters, setPending] = React.useState({ business_id: '', status: '', date_from: '', date_to: '' });
+  const [selectedLead, setSelected] = React.useState(null);
+
+  const PER_PAGE = 25;
+  const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
+
+  React.useEffect(() => {
+    fetch(API_BASE + '/api/businesses', { headers: { 'X-API-Secret': auth.secret || '' } })
+      .then(r => r.json())
+      .then(d => setBusinesses(d.businesses || []))
+      .catch(() => {});
+  }, []);
+
+  React.useEffect(() => { loadLeads(); }, [page, filters]);
+
+  async function loadLeads() {
+    setLoading(true);
+    const params = new URLSearchParams({ page, per_page: PER_PAGE });
+    if (filters.business_id) params.append('business_id', filters.business_id);
+    if (filters.status)      params.append('status', filters.status);
+    if (filters.date_from)   params.append('date_from', filters.date_from);
+    if (filters.date_to)     params.append('date_to', filters.date_to);
+    try {
+      const r = await fetch(API_BASE + '/api/leads?' + params, { headers: { 'X-API-Secret': auth.secret || '' } });
+      const d = await r.json();
+      setLeads(d.leads || []);
+      setTotal(d.total || 0);
+    } catch {}
+    setLoading(false);
+  }
+
+  function applyFilters() { setPage(1); setFilters({ ...pendingFilters }); }
+  function resetFilters() {
+    const empty = { business_id: '', status: '', date_from: '', date_to: '' };
+    setPending(empty); setPage(1); setFilters(empty);
+  }
+
+  function handleStatusChange(leadId, newStatus) {
+    setLeads(prev => prev.map(l => l.id === leadId ? { ...l, status: newStatus } : l));
+    if (selectedLead && selectedLead.id === leadId) setSelected(s => ({ ...s, status: newStatus }));
+  }
+
+  function exportCSV() {
+    const params = new URLSearchParams();
+    if (filters.business_id) params.append('business_id', filters.business_id);
+    if (filters.status)      params.append('status', filters.status);
+    if (auth.secret)         params.append('secret', auth.secret);
+    window.open(API_BASE + '/api/leads/export?' + params, '_blank');
+  }
+
+  function exportExcel() {
+    const rows = [
+      ['ID', 'Бизнес', 'Имя', 'Username', 'Телефон', 'Статус', 'Последняя активность', 'Создан'],
+      ...leads.map(l => [
+        l.id, l.business_name, l.full_name || '', l.username || '', l.phone || '', l.status || 'COLD',
+        l.last_active ? new Date(l.last_active).toLocaleString('ru') : '',
+        l.created_at ? new Date(l.created_at).toLocaleString('ru') : '',
+      ])
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Лиды');
+    XLSX.writeFile(wb, 'leads.xlsx');
+  }
+
+  function exportPDF() {
+    const win = window.open('', '_blank');
+    const rows = leads.map(l => `
+      <tr>
+        <td>${l.id}</td><td>${l.business_name || ''}</td>
+        <td>${l.full_name || ''}</td><td>${l.username ? '@' + l.username : ''}</td>
+        <td>${l.phone || ''}</td>
+        <td><b>${l.status || 'COLD'}</b></td>
+        <td>${fmtDate(l.created_at)}</td>
+      </tr>`).join('');
+    win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Лиды — Calvix</title>
+      <style>body{font-family:Arial,sans-serif;font-size:12px;padding:20px}
+      table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:6px 8px;text-align:left}
+      th{background:#f5f5f5;font-weight:700}</style></head><body>
+      <h2 style="margin-bottom:14px">Лиды — Calvix AI</h2>
+      <table><thead><tr><th>#</th><th>Бизнес</th><th>Имя</th><th>Username</th><th>Телефон</th><th>Статус</th><th>Дата</th></tr></thead>
+      <tbody>${rows}</tbody></table></body></html>`);
+    win.document.close();
+    win.print();
+  }
+
+  const statusBadge = s => {
+    const cls = s === 'HOT' ? 'badge-hot' : s === 'WARM' ? 'badge-warm' : 'badge-cold';
+    const ico = s === 'HOT' ? '🔥' : s === 'WARM' ? '⚡' : '❄️';
+    return <span className={`badge ${cls}`}>{ico} {s || 'COLD'}</span>;
+  };
+
+  return (
+    <div>
+      <div className="filters-bar">
+        <div className="filter-group">
+          <span className="filter-label">Бизнес</span>
+          <select className="filter-select" value={pendingFilters.business_id}
+            onChange={e => setPending(p => ({ ...p, business_id: e.target.value }))}>
+            <option value="">Все бизнесы</option>
+            {businesses.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </select>
+        </div>
+        <div className="filter-group">
+          <span className="filter-label">Статус</span>
+          <select className="filter-select" value={pendingFilters.status}
+            onChange={e => setPending(p => ({ ...p, status: e.target.value }))}>
+            <option value="">Все статусы</option>
+            <option value="HOT">🔥 HOT</option>
+            <option value="WARM">⚡ WARM</option>
+            <option value="COLD">❄️ COLD</option>
+          </select>
+        </div>
+        <div className="filter-group">
+          <span className="filter-label">Дата от</span>
+          <input type="date" className="filter-input" value={pendingFilters.date_from}
+            onChange={e => setPending(p => ({ ...p, date_from: e.target.value }))} />
+        </div>
+        <div className="filter-group">
+          <span className="filter-label">Дата до</span>
+          <input type="date" className="filter-input" value={pendingFilters.date_to}
+            onChange={e => setPending(p => ({ ...p, date_to: e.target.value }))} />
+        </div>
+        <div className="filters-actions">
+          <button className="btn btn-primary btn-sm" onClick={applyFilters}>Применить</button>
+          <button className="btn btn-ghost btn-sm" onClick={resetFilters}>Сбросить</button>
+        </div>
+      </div>
+
+      <div className="export-row">
+        <button className="export-btn export-csv"  onClick={exportCSV}>⬇ CSV</button>
+        <button className="export-btn export-xlsx" onClick={exportExcel}>⬇ Excel</button>
+        <button className="export-btn export-pdf"  onClick={exportPDF}>⬇ PDF</button>
+        <span className="leads-count">Всего лидов: <b>{total}</b> · Страница {page} из {totalPages}</span>
+      </div>
+
+      <div className="table-wrap">
+        {loading ? (
+          <div className="spinner-wrap"><div className="spinner" /><span>Загрузка...</span></div>
+        ) : leads.length === 0 ? (
+          <div className="table-empty">Лиды не найдены</div>
+        ) : (
+          <table className="table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Имя / Username</th>
+                <th>Бизнес</th>
+                <th>Телефон</th>
+                <th>Статус</th>
+                <th>Последняя активность</th>
+                <th>Создан</th>
+              </tr>
+            </thead>
+            <tbody>
+              {leads.map(lead => (
+                <tr key={lead.id} className="clickable" onClick={() => setSelected(lead)}>
+                  <td style={{color:'var(--ink-3)', fontVariantNumeric:'tabular-nums'}}>{lead.id}</td>
+                  <td>
+                    <div style={{fontWeight:600}}>{lead.full_name || '—'}</div>
+                    {lead.username && <div style={{color:'var(--ink-3)',fontSize:12}}>@{lead.username}</div>}
+                  </td>
+                  <td style={{color:'var(--ink-2)'}}>{lead.business_name || '—'}</td>
+                  <td style={{color:'var(--ink-3)'}}>{lead.phone || '—'}</td>
+                  <td onClick={e => e.stopPropagation()}>
+                    <div className="status-btns">
+                      {['HOT','WARM','COLD'].map(s => (
+                        <button key={s}
+                          className={`sbtn sbtn-${s.toLowerCase()}${(lead.status||'COLD') === s ? ' active' : ''}`}
+                          onClick={() => handleStatusChange(lead.id, s) || fetch(API_BASE + `/api/leads/${lead.id}/status`, {
+                            method:'PUT', headers:{'Content-Type':'application/json','X-API-Secret':auth.secret||''},
+                            body: JSON.stringify({status:s})
+                          })}>
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  </td>
+                  <td style={{color:'var(--ink-3)'}}>{fmtDate(lead.last_active)}</td>
+                  <td style={{color:'var(--ink-3)'}}>{fmtDate(lead.created_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        {!loading && leads.length > 0 && (
+          <div className="pagination">
+            <button className="page-btn" disabled={page <= 1} onClick={() => setPage(1)}>«</button>
+            <button className="page-btn" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>‹</button>
+            <span className="page-info">{page} / {totalPages}</span>
+            <button className="page-btn" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>›</button>
+            <button className="page-btn" disabled={page >= totalPages} onClick={() => setPage(totalPages)}>»</button>
+          </div>
+        )}
+      </div>
+
+      {selectedLead && (
+        <LeadHistoryModal
+          lead={selectedLead}
+          auth={auth}
+          onClose={() => setSelected(null)}
+          onStatusChange={handleStatusChange}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Admin Platform ─────────────────────────────────────────────────────────────
+function AdminPlatform({ auth, onLogout }) {
+  const [tab, setTab] = React.useState('leads');
+
+  const tabs = [
+    { key: 'leads',    label: 'Лиды' },
+    { key: 'bookings', label: 'Бронирования' },
+    { key: 'analytics',label: 'Аналитика' },
+    { key: 'settings', label: 'Настройки' },
+  ];
+
+  return (
+    <div className="shell">
+      <header className="header">
+        <div className="header-inner">
+          <div className="logo-wrap">
+            <div className="logo-mark">C</div>
+            <div>
+              <div className="logo-text">Calvix <em>AI</em></div>
+              <div className="logo-sub">Платформа</div>
+            </div>
+          </div>
+          <div className="header-right">
+            <span className="role-badge">Администратор</span>
+            <button className="logout-btn" onClick={onLogout}>Выйти</button>
+          </div>
+        </div>
+      </header>
+      <div className="page">
+        <div className="nav-tabs">
+          {tabs.map(t => (
+            <button key={t.key} className={`nav-tab${tab === t.key ? ' active' : ''}`}
+              onClick={() => setTab(t.key)}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {tab === 'leads' && <LeadsTab auth={auth} />}
+        {tab !== 'leads' && (
+          <div className="coming-card">
+            <div className="coming-icon">{tab === 'bookings' ? '📅' : tab === 'analytics' ? '📊' : '⚙️'}</div>
+            <div className="coming-title">
+              {tab === 'bookings' ? 'Бронирования' : tab === 'analytics' ? 'Аналитика' : 'Настройки'}
+            </div>
+            <div className="coming-sub">Этот раздел появится в следующей версии.</div>
+            <span className="coming-badge">Скоро</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── User Cabinet ───────────────────────────────────────────────────────────────
 function UserCabinet({ auth, onLogout }) {
   const name = auth.full_name || auth.email || auth.phone || 'Пользователь';
   const biz  = auth.business_name || null;
-
   return (
     <div className="shell">
       <header className="header">
@@ -349,51 +847,18 @@ function UserCabinet({ auth, onLogout }) {
           <div className="coming-title">Добро пожаловать{auth.full_name ? `, ${auth.full_name}` : ''}!</div>
           <div className="coming-sub">
             {biz
-              ? <>Вы вошли в личный кабинет бизнеса <strong>«{biz}»</strong>.<br />Разделы — лиды, созвоны, аналитика — появятся в ближайшее время.</>
-              : <>Ваш аккаунт создан. Обратитесь к администратору, чтобы привязать бизнес и активировать бота.</>
+              ? <>Вы вошли в кабинет бизнеса <strong>«{biz}»</strong>.<br />Разделы появятся в ближайшее время.</>
+              : <>Ваш аккаунт создан. Обратитесь к администратору чтобы привязать бизнес.</>
             }
           </div>
-          <span className="coming-badge">Часть 2 — в разработке</span>
+          <span className="coming-badge">Скоро</span>
         </div>
       </div>
     </div>
   );
 }
 
-// ── Admin Cabinet (placeholder) ───────────────────────────────────────────────
-function AdminPlatform({ auth, onLogout }) {
-  return (
-    <div className="shell">
-      <header className="header">
-        <div className="header-inner">
-          <div className="logo-wrap">
-            <div className="logo-mark">C</div>
-            <div>
-              <div className="logo-text">Calvix <em>AI</em></div>
-              <div className="logo-sub">Платформа</div>
-            </div>
-          </div>
-          <div className="header-right">
-            <span className="role-badge">Администратор</span>
-            <button className="logout-btn" onClick={onLogout}>Выйти</button>
-          </div>
-        </div>
-      </header>
-      <div className="page">
-        <div className="coming-card">
-          <div className="coming-icon">🛡️</div>
-          <div className="coming-title">Панель администратора</div>
-          <div className="coming-sub">
-            Авторизация прошла успешно. Управление бизнесами, лидами и пользователями появится в следующей части.
-          </div>
-          <span className="coming-badge">Часть 2 — в разработке</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Root App ──────────────────────────────────────────────────────────────────
+// ── Root App ───────────────────────────────────────────────────────────────────
 function App() {
   const [auth, setAuth] = React.useState(loadAuth);
 
