@@ -17,6 +17,7 @@ COPY bot/ ./bot/
 COPY migrations/ ./migrations/
 COPY alembic.ini .
 COPY scripts/ ./scripts/
+COPY dashboard.html .
 
 # Копирование entrypoint
 COPY docker/entrypoint.sh /entrypoint.sh
