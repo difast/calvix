@@ -3,7 +3,12 @@ import io
 import json
 import os
 import logging
-from datetime import datetime, timedelta
+import hashlib
+import hmac
+import base64
+import time
+import secrets
+from datetime import datetime
 from aiohttp import web
 from sqlalchemy import select, update, delete, func, text
 from bot.models.database import AsyncSessionLocal
@@ -11,11 +16,18 @@ from bot.models.business import Business
 from bot.models.lead import Lead
 from bot.models.message import Message
 from bot.models.booking import Booking
+from bot.models.user import User
 
 logger = logging.getLogger(__name__)
 
 API_SECRET = os.environ.get("API_SECRET", "calvix-admin-secret")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "calvix2025")
+JWT_SECRET = os.environ.get("JWT_SECRET", "calvix-jwt-secret-2025")
+
+DASHBOARD_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    "dashboard.html",
+)
 
 _multibot_manager = None
 
@@ -25,18 +37,74 @@ def set_manager(manager):
     _multibot_manager = manager
 
 
+# ─── Password utils ───────────────────────────────────────────────────────────
+
+def hash_password(password: str) -> str:
+    salt = secrets.token_hex(16)
+    dk = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 100000)
+    return f"{salt}:{base64.b64encode(dk).decode()}"
+
+
+def verify_password(stored: str, password: str) -> bool:
+    try:
+        salt, stored_b64 = stored.split(":", 1)
+        dk = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 100000)
+        return base64.b64encode(dk).decode() == stored_b64
+    except Exception:
+        return False
+
+
+# ─── JWT utils ────────────────────────────────────────────────────────────────
+
+def create_user_token(user_id: int, business_id) -> str:
+    payload = {"user_id": user_id, "business_id": business_id, "exp": int(time.time()) + 86400 * 30}
+    data = base64.urlsafe_b64encode(json.dumps(payload).encode()).decode().rstrip("=")
+    sig = hmac.new(JWT_SECRET.encode(), data.encode(), hashlib.sha256).hexdigest()
+    return f"{data}.{sig}"
+
+
+def verify_user_token(token: str):
+    try:
+        data, sig = token.rsplit(".", 1)
+        expected = hmac.new(JWT_SECRET.encode(), data.encode(), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(sig, expected):
+            return None
+        padding = 4 - len(data) % 4
+        payload = json.loads(base64.urlsafe_b64decode(data + ("=" * padding if padding != 4 else "")))
+        if payload.get("exp", 0) < time.time():
+            return None
+        return payload
+    except Exception:
+        return None
+
+
+# ─── Auth decorators ──────────────────────────────────────────────────────────
+
 def require_auth(handler):
     async def wrapper(request):
         secret = request.headers.get("X-API-Secret") or request.rel_url.query.get("secret")
         if secret != API_SECRET:
-            return web.json_response({"error": "Unauthorized"}, status=401)
+            return cors(web.json_response({"error": "Unauthorized"}, status=401))
+        return await handler(request)
+    return wrapper
+
+
+def require_user_auth(handler):
+    async def wrapper(request):
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            return cors(web.json_response({"error": "Unauthorized"}, status=401))
+        payload = verify_user_token(auth_header[7:])
+        if not payload:
+            return cors(web.json_response({"error": "Невалидный или просроченный токен"}, status=401))
+        request["user_payload"] = payload
         return await handler(request)
     return wrapper
 
 
 def cors(response):
     response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-API-Secret"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-API-Secret, Authorization"
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
     return response
 
@@ -45,7 +113,17 @@ async def handle_options(request):
     return cors(web.Response(status=200))
 
 
-# ─── Auth ───────────────────────────────────────────────────────────────────
+# ─── Dashboard serve ──────────────────────────────────────────────────────────
+
+async def serve_dashboard(request):
+    if os.path.exists(DASHBOARD_PATH):
+        with open(DASHBOARD_PATH, "r", encoding="utf-8") as f:
+            content = f.read()
+        return web.Response(text=content, content_type="text/html", charset="utf-8")
+    return web.Response(text="<h1>Dashboard not found</h1>", content_type="text/html", status=404)
+
+
+# ─── Admin login ──────────────────────────────────────────────────────────────
 
 async def admin_login(request):
     body = await request.json()
@@ -54,7 +132,98 @@ async def admin_login(request):
     return cors(web.json_response({"error": "Неверный пароль"}, status=401))
 
 
-# ─── Businesses ──────────────────────────────────────────────────────────────
+# ─── User auth ────────────────────────────────────────────────────────────────
+
+async def user_register(request):
+    body = await request.json()
+    email = (body.get("email") or "").strip().lower() or None
+    phone = (body.get("phone") or "").strip() or None
+    password = (body.get("password") or "").strip()
+    full_name = (body.get("full_name") or "").strip() or None
+
+    if not (email or phone):
+        return cors(web.json_response({"error": "Email или телефон обязателен"}, status=400))
+    if not password or len(password) < 6:
+        return cors(web.json_response({"error": "Пароль минимум 6 символов"}, status=400))
+
+    async with AsyncSessionLocal() as session:
+        if email:
+            cnt = await session.scalar(select(func.count()).select_from(User).where(User.email == email))
+            if cnt:
+                return cors(web.json_response({"error": "Email уже зарегистрирован"}, status=409))
+        if phone:
+            cnt = await session.scalar(select(func.count()).select_from(User).where(User.phone == phone))
+            if cnt:
+                return cors(web.json_response({"error": "Телефон уже зарегистрирован"}, status=409))
+
+        user = User(email=email, phone=phone, password_hash=hash_password(password), full_name=full_name)
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
+        user_id, business_id = user.id, user.business_id
+
+    token = create_user_token(user_id, business_id)
+    return cors(web.json_response({
+        "token": token, "user_id": user_id, "business_id": business_id,
+        "email": email, "phone": phone, "full_name": full_name, "business_name": None,
+    }, status=201))
+
+
+async def user_login(request):
+    body = await request.json()
+    email = (body.get("email") or "").strip().lower() or None
+    phone = (body.get("phone") or "").strip() or None
+    password = (body.get("password") or "").strip()
+
+    if not (email or phone) or not password:
+        return cors(web.json_response({"error": "Заполните все поля"}, status=400))
+
+    async with AsyncSessionLocal() as session:
+        if email:
+            result = await session.execute(select(User).where(User.email == email))
+        else:
+            result = await session.execute(select(User).where(User.phone == phone))
+        user = result.scalar_one_or_none()
+
+        if not user or not verify_password(user.password_hash, password):
+            return cors(web.json_response({"error": "Неверный логин или пароль"}, status=401))
+        if not user.is_active:
+            return cors(web.json_response({"error": "Аккаунт заблокирован"}, status=403))
+
+        business_name = None
+        if user.business_id:
+            biz = await session.get(Business, user.business_id)
+            business_name = biz.name if biz else None
+
+    token = create_user_token(user.id, user.business_id)
+    return cors(web.json_response({
+        "token": token, "user_id": user.id, "business_id": user.business_id,
+        "email": user.email, "phone": user.phone, "full_name": user.full_name,
+        "business_name": business_name,
+    }))
+
+
+@require_user_auth
+async def user_me(request):
+    payload = request["user_payload"]
+    async with AsyncSessionLocal() as session:
+        user = await session.get(User, payload["user_id"])
+        if not user:
+            return cors(web.json_response({"error": "Не найден"}, status=404))
+        business_name = None
+        if user.business_id:
+            biz = await session.get(Business, user.business_id)
+            business_name = biz.name if biz else None
+
+    token = create_user_token(user.id, user.business_id)
+    return cors(web.json_response({
+        "token": token, "user_id": user.id, "business_id": user.business_id,
+        "email": user.email, "phone": user.phone, "full_name": user.full_name,
+        "business_name": business_name,
+    }))
+
+
+# ─── Businesses ───────────────────────────────────────────────────────────────
 
 @require_auth
 async def list_businesses(request):
@@ -62,16 +231,13 @@ async def list_businesses(request):
         result = await session.execute(select(Business).order_by(Business.id))
         businesses = result.scalars().all()
 
-        # Статистика по каждому бизнесу
         stats = {}
         for b in businesses:
             total = await session.scalar(
                 select(func.count()).select_from(Lead).where(Lead.business_id == b.id)
             )
             hot = await session.scalar(
-                select(func.count()).select_from(Lead).where(
-                    Lead.business_id == b.id, Lead.status == "HOT"
-                )
+                select(func.count()).select_from(Lead).where(Lead.business_id == b.id, Lead.status == "HOT")
             )
             bookings = await session.scalar(
                 select(func.count()).select_from(Booking).where(Booking.business_id == b.id)
@@ -114,7 +280,7 @@ async def create_business(request):
 
         b = Business(
             bot_token=token, name=name, system_prompt=prompt,
-            welcome_message=welcome or None, manager_link=manager, is_active=is_active
+            welcome_message=welcome or None, manager_link=manager, is_active=is_active,
         )
         session.add(b)
         await session.commit()
@@ -157,7 +323,7 @@ async def delete_business(request):
     return cors(web.json_response({"message": "Удалено"}))
 
 
-# ─── Leads ───────────────────────────────────────────────────────────────────
+# ─── Leads ────────────────────────────────────────────────────────────────────
 
 @require_auth
 async def list_leads(request):
@@ -180,13 +346,10 @@ async def list_leads(request):
         if date_to:
             stmt = stmt.where(Lead.created_at <= datetime.fromisoformat(date_to))
 
-        total = await session.scalar(
-            select(func.count()).select_from(stmt.subquery())
-        )
+        total = await session.scalar(select(func.count()).select_from(stmt.subquery()))
         result = await session.execute(stmt.offset((page - 1) * per_page).limit(per_page))
         leads = result.scalars().all()
 
-        # Подтягиваем имена бизнесов
         biz_ids = list({l.business_id for l in leads})
         biz_result = await session.execute(select(Business).where(Business.id.in_(biz_ids)))
         biz_map = {b.id: b.name for b in biz_result.scalars().all()}
@@ -210,21 +373,48 @@ async def list_leads(request):
 
 
 @require_auth
+async def export_leads_csv(request):
+    q = request.rel_url.query
+    business_id = q.get("business_id")
+    status = q.get("status")
+
+    async with AsyncSessionLocal() as session:
+        stmt = select(Lead, Business.name).join(Business, Lead.business_id == Business.id)
+        if business_id:
+            stmt = stmt.where(Lead.business_id == int(business_id))
+        if status:
+            stmt = stmt.where(Lead.status == status)
+        stmt = stmt.order_by(Lead.created_at.desc())
+        result = await session.execute(stmt)
+        rows = result.all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["ID", "Бизнес", "Имя", "Username", "Телефон", "Статус", "Дата"])
+    for lead, biz_name in rows:
+        writer.writerow([
+            lead.id, biz_name, lead.full_name or "", lead.username or "",
+            lead.phone or "", lead.status or "COLD",
+            lead.created_at.strftime("%d.%m.%Y %H:%M") if lead.created_at else "",
+        ])
+
+    return cors(web.Response(
+        body=output.getvalue().encode("utf-8-sig"),
+        content_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=leads.csv"},
+    ))
+
+
+@require_auth
 async def get_lead_history(request):
     lead_id = int(request.match_info["id"])
     async with AsyncSessionLocal() as session:
         result = await session.execute(
-            select(Message)
-            .where(Message.lead_id == lead_id)
-            .order_by(Message.created_at.asc())
+            select(Message).where(Message.lead_id == lead_id).order_by(Message.created_at.asc())
         )
         messages = result.scalars().all()
         data = [
-            {
-                "role": m.role,
-                "content": m.content,
-                "created_at": m.created_at.isoformat() if m.created_at else None,
-            }
+            {"role": m.role, "content": m.content, "created_at": m.created_at.isoformat() if m.created_at else None}
             for m in messages
         ]
     return cors(web.json_response(data))
@@ -239,48 +429,12 @@ async def update_lead_status(request):
         return cors(web.json_response({"error": "Статус должен быть HOT, WARM или COLD"}, status=400))
 
     async with AsyncSessionLocal() as session:
-        await session.execute(
-            update(Lead).where(Lead.id == lead_id).values(status=status)
-        )
+        await session.execute(update(Lead).where(Lead.id == lead_id).values(status=status))
         await session.commit()
     return cors(web.json_response({"message": f"Статус изменён на {status}"}))
 
 
-@require_auth
-async def export_leads_csv(request):
-    q = request.rel_url.query
-    business_id = q.get("business_id")
-    status = q.get("status")
-
-    async with AsyncSessionLocal() as session:
-        stmt = select(Lead, Business.name).join(Business, Lead.business_id == Business.id)
-        if business_id:
-            stmt = stmt.where(Lead.business_id == int(business_id))
-        if status:
-            stmt = stmt.where(Lead.status == status)
-        stmt = stmt.order_by(Lead.created_at.desc())
-
-        result = await session.execute(stmt)
-        rows = result.all()
-
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(["ID", "Бизнес", "Имя", "Username", "Телефон", "Статус", "Дата"])
-    for lead, biz_name in rows:
-        writer.writerow([
-            lead.id, biz_name, lead.full_name or "", lead.username or "",
-            lead.phone or "", lead.status or "COLD",
-            lead.created_at.strftime("%d.%m.%Y %H:%M") if lead.created_at else ""
-        ])
-
-    return cors(web.Response(
-        body=output.getvalue().encode("utf-8-sig"),
-        content_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=leads.csv"}
-    ))
-
-
-# ─── Bookings ────────────────────────────────────────────────────────────────
+# ─── Bookings ─────────────────────────────────────────────────────────────────
 
 @require_auth
 async def list_bookings(request):
@@ -302,7 +456,6 @@ async def list_bookings(request):
 
         result = await session.execute(stmt)
         rows = result.all()
-
         data = [
             {
                 "id": b.id,
@@ -311,6 +464,7 @@ async def list_bookings(request):
                 "full_name": full_name or "",
                 "username": username or "",
                 "phone": b.phone or phone or "",
+                "scheduled_at": b.scheduled_at.isoformat() if b.scheduled_at else None,
                 "status": b.status or "pending",
                 "created_at": b.created_at.isoformat() if b.created_at else None,
             }
@@ -328,14 +482,12 @@ async def update_booking_status(request):
         return cors(web.json_response({"error": "Статус: pending, done, cancelled"}, status=400))
 
     async with AsyncSessionLocal() as session:
-        await session.execute(
-            update(Booking).where(Booking.id == booking_id).values(status=status)
-        )
+        await session.execute(update(Booking).where(Booking.id == booking_id).values(status=status))
         await session.commit()
-    return cors(web.json_response({"message": f"Статус созвона изменён на {status}"}))
+    return cors(web.json_response({"message": f"Статус изменён на {status}"}))
 
 
-# ─── Analytics ───────────────────────────────────────────────────────────────
+# ─── Analytics ────────────────────────────────────────────────────────────────
 
 @require_auth
 async def analytics_funnel(request):
@@ -358,11 +510,11 @@ async def analytics_funnel(request):
 
     return cors(web.json_response({
         "stages": [
-            {"label": "Всего лидов", "value": total, "color": "#6366f1"},
-            {"label": "Заинтересованы (WARM+)", "value": warm, "color": "#f59e0b"},
-            {"label": "HOT лиды", "value": hot, "color": "#ef4444"},
-            {"label": "Записались на созвон", "value": booked, "color": "#10b981"},
-            {"label": "Созвон проведён", "value": done, "color": "#059669"},
+            {"label": "Всего лидов", "value": total or 0, "color": "#6366f1"},
+            {"label": "Заинтересованы (WARM+)", "value": warm or 0, "color": "#f59e0b"},
+            {"label": "HOT лиды", "value": hot or 0, "color": "#ef4444"},
+            {"label": "Записались на созвон", "value": booked or 0, "color": "#10b981"},
+            {"label": "Созвон проведён", "value": done or 0, "color": "#059669"},
         ]
     }))
 
@@ -373,21 +525,17 @@ async def analytics_leads_by_day(request):
     days = int(request.rel_url.query.get("days", 14))
 
     async with AsyncSessionLocal() as session:
-        stmt = text("""
+        biz_filter = f"AND business_id = {int(business_id)}" if business_id else ""
+        stmt = text(f"""
             SELECT DATE(created_at) as day, COUNT(*) as cnt
             FROM leads
-            WHERE created_at >= NOW() - INTERVAL ':days days'
+            WHERE created_at >= NOW() - INTERVAL '{int(days)} days'
             {biz_filter}
             GROUP BY DATE(created_at)
             ORDER BY day ASC
-        """.replace(
-            "{biz_filter}",
-            f"AND business_id = {int(business_id)}" if business_id else ""
-        ).replace(":days", str(days)))
-
+        """)
         result = await session.execute(stmt)
-        rows = result.all()
-        data = [{"day": str(r.day), "count": r.cnt} for r in rows]
+        data = [{"day": str(r.day), "count": int(r.cnt)} for r in result.all()]
 
     return cors(web.json_response(data))
 
@@ -397,33 +545,30 @@ async def analytics_trigger_words(request):
     business_id = request.rel_url.query.get("business_id")
 
     async with AsyncSessionLocal() as session:
-        # Берём последние сообщения от пользователей и считаем триггерные слова
         stmt = select(Message.content).where(Message.role == "user")
         if business_id:
             stmt = stmt.where(Message.business_id == int(business_id))
         stmt = stmt.limit(1000)
-
         result = await session.execute(stmt)
         messages = [r[0] for r in result.all()]
 
     HOT_KEYWORDS = [
         "купить", "записаться", "хочу начать", "сколько стоит",
         "цена", "стоимость", "оплатить", "запишите", "давайте",
-        "готов", "когда можно", "как записаться", "хочу", "запиши"
+        "готов", "когда можно", "как записаться", "хочу", "запиши",
     ]
-
     counts = {}
     for msg in messages:
-        text_lower = msg.lower()
+        tl = msg.lower()
         for kw in HOT_KEYWORDS:
-            if kw in text_lower:
+            if kw in tl:
                 counts[kw] = counts.get(kw, 0) + 1
 
     sorted_words = sorted(counts.items(), key=lambda x: x[1], reverse=True)[:10]
     return cors(web.json_response([{"word": w, "count": c} for w, c in sorted_words]))
 
 
-# ─── Platform ────────────────────────────────────────────────────────────────
+# ─── Platform ─────────────────────────────────────────────────────────────────
 
 @require_auth
 async def platform_status(request):
@@ -434,27 +579,25 @@ async def platform_status(request):
             select(func.count()).select_from(Lead).where(Lead.status == "HOT")
         )
         total_bookings = await session.scalar(select(func.count()).select_from(Booking))
+        total_users = await session.scalar(select(func.count()).select_from(User))
 
-        bots_status = []
         active_ids = set(_multibot_manager.bots.keys()) if _multibot_manager else set()
-        for b in businesses:
-            bots_status.append({
-                "id": b.id,
-                "name": b.name,
-                "is_active": b.is_active,
-                "online": b.id in active_ids,
-            })
+        bots_status = [
+            {"id": b.id, "name": b.name, "is_active": b.is_active, "online": b.id in active_ids}
+            for b in businesses
+        ]
 
     return cors(web.json_response({
         "bots": bots_status,
         "total_leads": total_leads,
         "total_hot": total_hot,
         "total_bookings": total_bookings,
+        "total_users": total_users,
         "active_bots": len(active_ids),
     }))
 
 
-# ─── Helpers ─────────────────────────────────────────────────────────────────
+# ─── Helpers ──────────────────────────────────────────────────────────────────
 
 @require_auth
 async def reload_bots(request):
@@ -471,32 +614,41 @@ async def _reload_bots():
             logger.error(f"Ошибка перезагрузки через API: {e}")
 
 
-# ─── Router ──────────────────────────────────────────────────────────────────
+# ─── Router ───────────────────────────────────────────────────────────────────
 
 def create_app() -> web.Application:
     app = web.Application()
     app.router.add_route("OPTIONS", "/{path_info:.*}", handle_options)
 
-    # Auth
+    # Dashboard
+    app.router.add_get("/", serve_dashboard)
+    app.router.add_get("/dashboard", serve_dashboard)
+
+    # Admin login
     app.router.add_post("/api/login", admin_login)
 
-    # Businesses
+    # User auth
+    app.router.add_post("/api/auth/register", user_register)
+    app.router.add_post("/api/auth/login", user_login)
+    app.router.add_get("/api/auth/me", user_me)
+
+    # Businesses (admin)
     app.router.add_get("/api/businesses", list_businesses)
     app.router.add_post("/api/businesses", create_business)
     app.router.add_put("/api/businesses/{id}", update_business)
     app.router.add_delete("/api/businesses/{id}", delete_business)
 
-    # Leads
+    # Leads (admin) — export BEFORE {id} routes
+    app.router.add_get("/api/leads/export", export_leads_csv)
     app.router.add_get("/api/leads", list_leads)
     app.router.add_get("/api/leads/{id}/history", get_lead_history)
     app.router.add_put("/api/leads/{id}/status", update_lead_status)
-    app.router.add_get("/api/leads/export", export_leads_csv)
 
-    # Bookings
+    # Bookings (admin)
     app.router.add_get("/api/bookings", list_bookings)
     app.router.add_put("/api/bookings/{id}/status", update_booking_status)
 
-    # Analytics
+    # Analytics (admin)
     app.router.add_get("/api/analytics/funnel", analytics_funnel)
     app.router.add_get("/api/analytics/leads-by-day", analytics_leads_by_day)
     app.router.add_get("/api/analytics/trigger-words", analytics_trigger_words)
