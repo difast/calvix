@@ -1083,7 +1083,7 @@ function PlatformModal({auth,onClose}){
         fetch(API_BASE+'/api/businesses',{headers:H}).then(r=>r.json()),
         fetch(API_BASE+'/api/platform/status',{headers:H}).then(r=>r.json()).catch(()=>null),
       ]);
-      setBusinesses(Array.isArray(rb)?rb:[]);
+      setBusinesses(Array.isArray(rb.businesses)?rb.businesses:Array.isArray(rb)?rb:[]);
       setStatus(rs);
     }catch(e){console.error(e);}
     setLoading(false);
@@ -1264,6 +1264,7 @@ function AdminPlatform({auth,onLogout}){
   const [bizFilter,setBiz]=React.useState('all');
   const [businesses,setBusinesses]=React.useState([]);
   const [lastRefresh,setLastRefresh]=React.useState(null);
+  const [showPlatform,setShowPlatform]=React.useState(false);
 
   React.useEffect(()=>{
     fetch(API_BASE+'/api/businesses',{headers:{'X-API-Secret':auth.secret||''}})
@@ -1296,6 +1297,7 @@ function AdminPlatform({auth,onLogout}){
               {lastRefresh?lastRefresh.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}):'—'}
             </div>
             <button className="hdr-btn" onClick={()=>setLastRefresh(new Date())}><IcoRefresh/> Обновить</button>
+            <button className="hdr-btn" onClick={()=>setShowPlatform(true)}>⚙️ Платформа</button>
             <button className="hdr-btn" onClick={onLogout} style={{color:'rgba(252,165,165,.7)'}}>Выйти</button>
           </div>
         </div>
@@ -1327,6 +1329,8 @@ function AdminPlatform({auth,onLogout}){
           ))}
         </div>
       </nav>
+
+      {showPlatform&&<PlatformModal auth={auth} onClose={()=>setShowPlatform(false)}/>}
 
       <div className="page">
         {tab==='overview'  &&<OverviewTab  auth={auth} period={period} bizFilter={bizFilter==='all'?'':bizFilter}/>}
