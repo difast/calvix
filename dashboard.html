@@ -1062,6 +1062,201 @@ function BookingsTab({auth}){
   );
 }
 
+// ── Platform Modal ────────────────────────────────────────────────────────────
+function PlatformModal({auth,onClose}){
+  const [view,setView]=React.useState('list'); // list | add | edit
+  const [businesses,setBusinesses]=React.useState([]);
+  const [status,setStatus]=React.useState(null);
+  const [editBiz,setEditBiz]=React.useState(null);
+  const [loading,setLoading]=React.useState(false);
+  const [saving,setSaving]=React.useState(false);
+  const [msg,setMsg]=React.useState(null);
+  const emptyForm={bot_token:'',name:'',system_prompt:'',welcome_message:'',manager_link:'@akovpyat',is_active:true};
+  const [form,setForm]=React.useState(emptyForm);
+
+  const H={'Content-Type':'application/json','X-API-Secret':auth.secret||''};
+
+  async function load(){
+    setLoading(true);
+    try{
+      const [rb,rs]=await Promise.all([
+        fetch(API_BASE+'/api/businesses',{headers:H}).then(r=>r.json()),
+        fetch(API_BASE+'/api/platform/status',{headers:H}).then(r=>r.json()).catch(()=>null),
+      ]);
+      setBusinesses(Array.isArray(rb)?rb:[]);
+      setStatus(rs);
+    }catch(e){console.error(e);}
+    setLoading(false);
+  }
+
+  React.useEffect(()=>{load();},[]);
+
+  function openAdd(){setForm(emptyForm);setView('add');}
+  function openEdit(b){
+    setEditBiz(b);
+    setForm({bot_token:b.bot_token,name:b.name,system_prompt:b.system_prompt,welcome_message:b.welcome_message||'',manager_link:b.manager_link||'@akovpyat',is_active:b.is_active});
+    setView('edit');
+  }
+
+  async function save(){
+    if(!form.bot_token||!form.name||!form.system_prompt){setMsg({ok:false,text:'Заполните токен, название и промпт'});return;}
+    setSaving(true);setMsg(null);
+    try{
+      const url=view==='edit'?API_BASE+`/api/businesses/${editBiz.id}`:API_BASE+'/api/businesses';
+      const method=view==='edit'?'PUT':'POST';
+      const r=await fetch(url,{method,headers:H,body:JSON.stringify(form)});
+      const d=await r.json();
+      if(!r.ok){setMsg({ok:false,text:d.error||'Ошибка'});}
+      else{setMsg({ok:true,text:view==='edit'?'Обновлено':'Бизнес добавлен'});await load();setView('list');}
+    }catch(e){setMsg({ok:false,text:'Сетевая ошибка'});}
+    setSaving(false);
+  }
+
+  async function toggleActive(b){
+    await fetch(API_BASE+`/api/businesses/${b.id}`,{method:'PUT',headers:H,body:JSON.stringify({is_active:!b.is_active})});
+    load();
+  }
+
+  const onlineIds=new Set((status?.bots||[]).filter(b=>b.online).map(b=>b.id));
+
+  // ── styles inline ──
+  const card={background:'var(--bg-card)',border:'1px solid var(--line)',borderRadius:'var(--radius)',boxShadow:'var(--shadow)'};
+  const inp={width:'100%',padding:'8px 12px',borderRadius:'var(--radius-sm)',border:'1px solid var(--line)',background:'var(--bg-page)',color:'var(--ink)',font:'inherit',fontSize:13,outline:'none',boxSizing:'border-box'};
+  const lbl={fontSize:11,fontWeight:600,color:'var(--ink-3)',textTransform:'uppercase',letterSpacing:'.05em',display:'block',marginBottom:4};
+
+  function FormView(){
+    return(
+      <div style={{maxWidth:680,margin:'0 auto',display:'flex',flexDirection:'column',gap:16}}>
+        {msg&&<div style={{padding:'10px 14px',borderRadius:'var(--radius-sm)',background:msg.ok?'#f0fdf4':'#fff5f5',color:msg.ok?'#166534':'#991b1b',border:`1px solid ${msg.ok?'#86efac':'#fca5a5'}`,fontSize:13}}>{msg.text}</div>}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+          <div>
+            <label style={lbl}>Токен бота *</label>
+            <input style={inp} placeholder="1234567890:AAF..." value={form.bot_token} onChange={e=>setForm(f=>({...f,bot_token:e.target.value}))}/>
+          </div>
+          <div>
+            <label style={lbl}>Название бизнеса *</label>
+            <input style={inp} placeholder="Школа программирования" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))}/>
+          </div>
+        </div>
+        <div>
+          <label style={lbl}>Системный промпт * <span style={{color:'var(--ink-4)',fontWeight:400}}>(инструкция для AI)</span></label>
+          <textarea style={{...inp,height:180,resize:'vertical',lineHeight:1.6}} placeholder="Ты — менеджер по продажам..." value={form.system_prompt} onChange={e=>setForm(f=>({...f,system_prompt:e.target.value}))}/>
+        </div>
+        <div>
+          <label style={lbl}>Welcome-сообщение <span style={{color:'var(--ink-4)',fontWeight:400}}>(первое сообщение бота)</span></label>
+          <textarea style={{...inp,height:80,resize:'vertical'}} placeholder="Привет! Я..." value={form.welcome_message} onChange={e=>setForm(f=>({...f,welcome_message:e.target.value}))}/>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+          <div>
+            <label style={lbl}>Менеджер (ссылка)</label>
+            <input style={inp} placeholder="@username" value={form.manager_link} onChange={e=>setForm(f=>({...f,manager_link:e.target.value}))}/>
+          </div>
+          <div style={{display:'flex',alignItems:'center',gap:10,paddingTop:20}}>
+            <input type="checkbox" id="is_active" checked={form.is_active} onChange={e=>setForm(f=>({...f,is_active:e.target.checked}))} style={{width:16,height:16,cursor:'pointer'}}/>
+            <label htmlFor="is_active" style={{...lbl,margin:0,cursor:'pointer'}}>Бот активен</label>
+          </div>
+        </div>
+        <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
+          <button className="btn btn-ghost" onClick={()=>{setView('list');setMsg(null);}}>Отмена</button>
+          <button className="btn btn-primary" onClick={save} disabled={saving}>{saving?'Сохранение…':view==='edit'?'Сохранить изменения':'Добавить бизнес'}</button>
+        </div>
+      </div>
+    );
+  }
+
+  function ListView(){
+    const bots=status?.bots||[];
+    return(
+      <div style={{display:'flex',flexDirection:'column',gap:20}}>
+        {/* Платформа статус */}
+        {status&&(
+          <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12}}>
+            {[
+              {l:'Всего лидов',v:status.total_leads,c:'var(--c4)'},
+              {l:'HOT лидов',v:status.total_hot,c:'var(--c3)'},
+              {l:'Записей',v:status.total_bookings,c:'var(--c2)'},
+              {l:'Ботов онлайн',v:status.active_bots,c:'var(--c1)'},
+            ].map(s=>(
+              <div key={s.l} style={{...card,padding:'14px 18px',textAlign:'center'}}>
+                <div className="mono" style={{fontSize:28,fontWeight:700,color:s.c}}>{s.v??'—'}</div>
+                <div style={{fontSize:11,color:'var(--ink-3)',marginTop:2}}>{s.l}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Список бизнесов */}
+        <div style={{display:'flex',flexDirection:'column',gap:12}}>
+          {loading?<div className="spinner-wrap"><div className="spinner"/><span>Загрузка…</span></div>
+          :businesses.map(b=>{
+            const online=onlineIds.has(b.id);
+            const botSt=bots.find(x=>x.id===b.id);
+            return(
+              <div key={b.id} style={{...card,padding:'18px 20px',display:'flex',gap:16,alignItems:'flex-start'}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:6}}>
+                    <span style={{fontWeight:700,fontSize:15}}>{b.name}</span>
+                    <span style={{display:'inline-flex',alignItems:'center',gap:4,padding:'2px 8px',borderRadius:999,fontSize:11,fontWeight:700,
+                      background:online?'#f0fdf4':'#fafafa',color:online?'#166534':'var(--ink-4)',
+                      border:`1px solid ${online?'#86efac':'var(--line)'}`}}>
+                      <span style={{width:6,height:6,borderRadius:'50%',background:online?'#22c55e':'var(--ink-4)',display:'inline-block'}}/>
+                      {online?'Онлайн':'Офлайн'}
+                    </span>
+                    {!b.is_active&&<span style={{padding:'2px 8px',borderRadius:999,fontSize:11,fontWeight:600,background:'#fff5f5',color:'#991b1b',border:'1px solid #fca5a5'}}>Отключён</span>}
+                  </div>
+                  <div style={{fontSize:12,color:'var(--ink-3)',fontFamily:'"Geist Mono",monospace',marginBottom:8}}>{b.bot_token.slice(0,20)}…</div>
+                  <div style={{display:'flex',gap:16,flexWrap:'wrap'}}>
+                    {[
+                      {l:'Лидов',v:b.stats?.total_leads??0},
+                      {l:'HOT',v:b.stats?.hot_leads??0},
+                      {l:'Записей',v:b.stats?.bookings??0},
+                    ].map(s=>(
+                      <div key={s.l} style={{textAlign:'center'}}>
+                        <div style={{fontWeight:700,fontSize:16,color:'var(--ink)'}}>{s.v}</div>
+                        <div style={{fontSize:10,color:'var(--ink-4)',textTransform:'uppercase',letterSpacing:'.05em'}}>{s.l}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div style={{display:'flex',gap:6,flexShrink:0,flexWrap:'wrap',justifyContent:'flex-end'}}>
+                  <button className="btn btn-ghost btn-sm" onClick={()=>openEdit(b)}>✏️ Редактировать</button>
+                  <button className="btn btn-ghost btn-sm" style={{color:b.is_active?'var(--danger)':'var(--c1)',borderColor:b.is_active?'var(--danger-line)':'#86efac'}}
+                    onClick={()=>toggleActive(b)}>{b.is_active?'⏸ Отключить':'▶ Включить'}</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div style={{display:'flex',justifyContent:'flex-end'}}>
+          <button className="btn btn-primary" onClick={openAdd}>+ Добавить бизнес</button>
+        </div>
+      </div>
+    );
+  }
+
+  return(
+    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal" style={{maxWidth:820,maxHeight:'92vh'}}>
+        <div className="modal-hd" style={{background:'var(--bg-dg)',borderRadius:'var(--radius) var(--radius) 0 0'}}>
+          <div className="modal-hd-info">
+            <div className="modal-hd-name" style={{color:'#fff',fontSize:17}}>
+              {view==='list'?'⚙️ Управление платформой':view==='add'?'➕ Новый бизнес':'✏️ Редактировать бизнес'}
+            </div>
+            <div className="modal-hd-meta" style={{color:'rgba(255,255,255,.5)'}}>
+              {view==='list'?`${businesses.length} бизнесов`:'Заполните данные'}
+            </div>
+          </div>
+          <button className="modal-close" onClick={onClose} style={{background:'rgba(255,255,255,.1)',color:'#fff',border:'1px solid rgba(255,255,255,.2)'}}>×</button>
+        </div>
+        <div className="modal-body" style={{padding:24}}>
+          {view==='list'?<ListView/>:<FormView/>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Admin Platform ────────────────────────────────────────────────────────────
 function AdminPlatform({auth,onLogout}){
   const [tab,setTab]=React.useState('overview');
