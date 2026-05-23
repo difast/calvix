@@ -1325,10 +1325,11 @@ function PlatformModal({auth,onClose}){
 
   function ListView(){
     const bots=status?.bots||[];
+    const hasBiz=businesses.length>0;
     return(
       <div style={{display:'flex',flexDirection:'column',gap:20}}>
-        {/* Платформа статус */}
-        {status&&(
+        {/* Платформа статус — только когда есть хотя бы один бизнес */}
+        {status&&hasBiz&&(
           <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12}}>
             {[
               {l:'Всего лидов',v:status.total_leads,c:'var(--c4)'},
@@ -1341,6 +1342,17 @@ function PlatformModal({auth,onClose}){
                 <div style={{fontSize:11,color:'var(--ink-3)',marginTop:2}}>{s.l}</div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Пустой стейт — нет бизнесов */}
+        {!loading&&!hasBiz&&(
+          <div style={{textAlign:'center',padding:'40px 20px'}}>
+            <div style={{fontSize:48,marginBottom:16}}>🚀</div>
+            <div style={{fontWeight:700,fontSize:18,color:'var(--ink)',marginBottom:8}}>Запустите своего первого AI-продавца</div>
+            <div style={{fontSize:13,color:'var(--ink-3)',maxWidth:380,margin:'0 auto',lineHeight:1.6}}>
+              Добавьте бизнес — и бот начнёт обрабатывать клиентов, собирать лиды и записывать на встречи без вашего участия.
+            </div>
           </div>
         )}
 
