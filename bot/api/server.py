@@ -83,13 +83,21 @@ def verify_user_token(token: str):
 
 def require_auth(handler):
     async def wrapper(request):
+        secret = request.headers.get("X-API-Secret", "")
+        if secret != API_SECRET:
+            return cors(web.json_response({"error": "Не авторизован"}, status=401))
         return await handler(request)
     return wrapper
 
 
 def require_user_auth(handler):
     async def wrapper(request):
-        request["user_payload"] = {"user_id": None, "business_id": None}
+        auth_header = request.headers.get("Authorization", "")
+        token = auth_header.replace("Bearer ", "").strip()
+        payload = verify_user_token(token)
+        if not payload or not payload.get("user_id"):
+            return cors(web.json_response({"error": "Не авторизован"}, status=401))
+        request["user_payload"] = payload
         return await handler(request)
     return wrapper
 
@@ -167,6 +175,7 @@ async def user_register(request):
     return cors(web.json_response({
         "token": token, "user_id": user_id, "business_id": business_id,
         "email": email, "phone": phone, "full_name": full_name, "business_name": None,
+        "company": None, "bio": None, "socials": {},
     }, status=201))
 
 
@@ -196,10 +205,18 @@ async def user_login(request):
             biz = await session.get(Business, user.business_id)
             business_name = biz.name if biz else None
 
+    import json as _json
+    socials = {}
+    if user.socials:
+        try:
+            socials = _json.loads(user.socials)
+        except Exception:
+            pass
     token = create_user_token(user.id, user.business_id)
     return cors(web.json_response({
         "token": token, "user_id": user.id, "business_id": user.business_id,
         "email": user.email, "phone": user.phone, "full_name": user.full_name,
+        "company": user.company, "bio": user.bio, "socials": socials,
         "business_name": business_name,
     }))
 
@@ -216,12 +233,98 @@ async def user_me(request):
             biz = await session.get(Business, user.business_id)
             business_name = biz.name if biz else None
 
+    import json as _json
+    socials = {}
+    if user.socials:
+        try:
+            socials = _json.loads(user.socials)
+        except Exception:
+            pass
     token = create_user_token(user.id, user.business_id)
     return cors(web.json_response({
         "token": token, "user_id": user.id, "business_id": user.business_id,
         "email": user.email, "phone": user.phone, "full_name": user.full_name,
+        "company": user.company, "bio": user.bio, "socials": socials,
         "business_name": business_name,
     }))
+
+
+# ─── User profile / password ──────────────────────────────────────────────────
+
+@require_user_auth
+async def update_profile(request):
+    payload = request["user_payload"]
+    body = await request.json()
+    async with AsyncSessionLocal() as session:
+        user = await session.get(User, payload["user_id"])
+        if not user:
+            return cors(web.json_response({"error": "Не найден"}, status=404))
+        if "full_name" in body: user.full_name = body["full_name"]
+        if "company" in body: user.company = body["company"]
+        if "bio" in body: user.bio = body["bio"]
+        if "socials" in body:
+            import json as _json
+            user.socials = _json.dumps(body["socials"], ensure_ascii=False)
+        await session.commit()
+    return cors(web.json_response({"ok": True}))
+
+
+@require_user_auth
+async def change_user_password(request):
+    payload = request["user_payload"]
+    body = await request.json()
+    new_pw = (body.get("new_password") or "").strip()
+    if len(new_pw) < 6:
+        return cors(web.json_response({"error": "Минимум 6 символов"}, status=400))
+    async with AsyncSessionLocal() as session:
+        user = await session.get(User, payload["user_id"])
+        if not user:
+            return cors(web.json_response({"error": "Не найден"}, status=404))
+        user.password_hash = hash_password(new_pw)
+        await session.commit()
+    return cors(web.json_response({"ok": True}))
+
+
+# ─── Admin user management ────────────────────────────────────────────────────
+
+@require_auth
+async def admin_list_users(request):
+    import json as _json
+    search = request.rel_url.query.get("search", "").strip().lower()
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(User).order_by(User.created_at.desc()))
+        users = result.scalars().all()
+        data = []
+        for u in users:
+            if search and search not in (u.full_name or "").lower() and search not in (u.phone or "").lower():
+                continue
+            biz_name = None
+            if u.business_id:
+                biz = await session.get(Business, u.business_id)
+                biz_name = biz.name if biz else None
+            socials = {}
+            if u.socials:
+                try: socials = _json.loads(u.socials)
+                except: pass
+            data.append({
+                "id": u.id, "full_name": u.full_name, "phone": u.phone,
+                "email": u.email, "company": u.company, "bio": u.bio,
+                "socials": socials, "business_id": u.business_id,
+                "business_name": biz_name, "is_active": u.is_active,
+                "created_at": u.created_at.isoformat() if u.created_at else None,
+            })
+    return cors(web.json_response({"users": data}))
+
+
+@require_auth
+async def change_admin_password(request):
+    global ADMIN_PASSWORD
+    body = await request.json()
+    new_pw = (body.get("new_password") or "").strip()
+    if len(new_pw) < 6:
+        return cors(web.json_response({"error": "Минимум 6 символов"}, status=400))
+    ADMIN_PASSWORD = new_pw
+    return cors(web.json_response({"ok": True, "note": "Пароль изменён до перезапуска"}))
 
 
 # ─── Businesses ───────────────────────────────────────────────────────────────
@@ -702,6 +805,17 @@ def create_app() -> web.Application:
     app.router.add_post("/api/auth/register", user_register)
     app.router.add_post("/api/auth/login", user_login)
     app.router.add_get("/api/auth/me", user_me)
+    app.router.add_put("/api/auth/profile", update_profile)
+    app.router.add_put("/api/auth/password", change_user_password)
+    app.router.add_route("OPTIONS", "/api/auth/profile", handle_options)
+    app.router.add_route("OPTIONS", "/api/auth/password", handle_options)
+
+    # Admin user management
+    app.router.add_get("/api/admin/users", admin_list_users)
+    app.router.add_put("/api/admin/password", change_admin_password)
+    app.router.add_post("/api/admin/password", change_admin_password)
+    app.router.add_route("OPTIONS", "/api/admin/users", handle_options)
+    app.router.add_route("OPTIONS", "/api/admin/password", handle_options)
 
     # Businesses (admin)
     app.router.add_get("/api/businesses", list_businesses)

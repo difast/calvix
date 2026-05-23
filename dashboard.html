@@ -155,6 +155,17 @@ select.sel option{background:#0d2b1f;color:#fff;}
 .analytics-card:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(13,43,31,.12);border-color:rgba(22,163,74,.3);}
 .biz-card{transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease;}
 .biz-card:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(13,43,31,.1);border-color:rgba(22,163,74,.4);}
+/* ── Profile dropdown ── */
+.profile-btn{display:flex;align-items:center;gap:8px;padding:5px 10px;border-radius:var(--radius-sm);background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:var(--inv-2);font:inherit;font-size:12px;cursor:pointer;transition:background .15s;}
+.profile-btn:hover{background:rgba(255,255,255,.18);}
+.profile-avatar{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#1db954,#0d7a38);display:grid;place-items:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0;box-shadow:0 2px 6px rgba(29,185,84,.3);}
+.dropdown{position:absolute;right:0;top:calc(100% + 8px);background:var(--bg-card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow-lg);min-width:210px;z-index:50;overflow:hidden;animation:fadeIn .15s ease;}
+.dropdown-item{display:flex;align-items:center;gap:10px;padding:10px 14px;font:inherit;font-size:13px;background:transparent;border:0;cursor:pointer;color:var(--ink-2);width:100%;text-align:left;transition:background .1s;}
+.dropdown-item:hover{background:var(--bg-hover);}
+.dropdown-sep{height:1px;background:var(--line);margin:4px 0;}
+.page{animation:fadeIn .18s ease;}
+.user-card{background:var(--bg-card);border:1px solid var(--line);border-radius:var(--radius);padding:16px 20px;box-shadow:var(--shadow);cursor:pointer;transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease;}
+.user-card:hover{transform:translateY(-2px);box-shadow:0 6px 24px rgba(13,43,31,.12);border-color:rgba(22,163,74,.35);}
 .kpi-card::after{
   content:'';position:absolute;inset:0;border-radius:var(--radius);
   border-top:3px solid var(--kpi-color);pointer-events:none;
@@ -919,7 +930,7 @@ function AnalyticsTab({auth}){
 
   React.useEffect(()=>{
     fetch(API_BASE+'/api/businesses',{headers:{'X-API-Secret':auth.secret||''}})
-      .then(r=>r.json()).then(d=>setBusinesses(d.businesses||[])).catch(()=>{});
+      .then(r=>r.json()).then(d=>setBusinesses(Array.isArray(d.businesses)?d.businesses:Array.isArray(d)?d:[])).catch(()=>{});
   },[]);
 
   React.useEffect(()=>{load();},[bizFilter,days]);
@@ -1530,6 +1541,340 @@ function SettingsTab({auth}){
   );
 }
 
+// ── Profile Dropdown ─────────────────────────────────────────────────────────
+function ProfileDropdown({auth,onLogout,onEditProfile,onChangePassword}){
+  const [open,setOpen]=React.useState(false);
+  const ref=React.useRef(null);
+  React.useEffect(()=>{
+    function h(e){if(ref.current&&!ref.current.contains(e.target))setOpen(false);}
+    document.addEventListener('mousedown',h);
+    return()=>document.removeEventListener('mousedown',h);
+  },[]);
+  const initials=(auth.full_name||auth.phone||auth.email||'?').slice(0,2).toUpperCase();
+  const displayName=auth.full_name||(auth.role==='admin'?'Администратор':auth.phone||auth.email||'Профиль');
+  return(
+    <div style={{position:'relative'}} ref={ref}>
+      <button className="profile-btn" onClick={()=>setOpen(o=>!o)}>
+        <div className="profile-avatar">{initials}</div>
+        <span style={{maxWidth:130,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{displayName}</span>
+        <span style={{fontSize:9,opacity:.5,marginLeft:2,transform:open?'rotate(180deg)':'none',transition:'transform .2s',display:'inline-block'}}>▼</span>
+      </button>
+      {open&&(
+        <div className="dropdown">
+          <div style={{padding:'12px 14px 10px'}}>
+            <div style={{fontWeight:700,fontSize:13,color:'var(--ink)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{displayName}</div>
+            {auth.company&&<div style={{fontSize:11,color:'var(--ink-3)',marginTop:1}}>{auth.company}</div>}
+            <div style={{fontSize:11,color:'var(--ink-4)',marginTop:1}}>{auth.phone||auth.email||''}</div>
+          </div>
+          <div className="dropdown-sep"/>
+          {auth.role!=='admin'&&<button className="dropdown-item" onClick={()=>{setOpen(false);onEditProfile();}}>✏️ Редактировать профиль</button>}
+          <button className="dropdown-item" onClick={()=>{setOpen(false);onChangePassword();}}>🔑 Сменить пароль</button>
+          {auth.role!=='admin'&&<>
+            <div className="dropdown-sep"/>
+            <button className="dropdown-item" onClick={()=>setOpen(false)}>
+              💳 Оплата
+              <span style={{marginLeft:'auto',fontSize:10,padding:'2px 7px',borderRadius:4,background:'rgba(22,163,74,.1)',color:'var(--accent)',fontWeight:600,border:'1px solid rgba(22,163,74,.15)'}}>Скоро</span>
+            </button>
+          </>}
+          <div className="dropdown-sep"/>
+          <button className="dropdown-item" style={{color:'rgba(220,38,38,.8)'}} onClick={()=>{setOpen(false);onLogout();}}>🚪 Выйти</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Profile Modal ─────────────────────────────────────────────────────────────
+function ProfileModal({auth,onClose,onSave}){
+  const [form,setForm]=React.useState({
+    full_name:auth.full_name||'',
+    company:auth.company||'',
+    bio:auth.bio||'',
+    socials:{instagram:'',telegram:'',vk:'',website:'',...(auth.socials||{})},
+  });
+  const [saving,setSaving]=React.useState(false);
+  const [msg,setMsg]=React.useState(null);
+  const inp={width:'100%',padding:'9px 12px',borderRadius:'var(--radius-sm)',border:'1px solid var(--line)',background:'var(--bg-page)',color:'var(--ink)',font:'inherit',fontSize:13,outline:'none',boxSizing:'border-box',transition:'border-color .15s'};
+  const lbl={fontSize:11,fontWeight:600,color:'var(--ink-3)',textTransform:'uppercase',letterSpacing:'.05em',display:'block',marginBottom:4};
+
+  async function save(){
+    setSaving(true);setMsg(null);
+    try{
+      const r=await fetch(API_BASE+'/api/auth/profile',{method:'PUT',
+        headers:{'Content-Type':'application/json','Authorization':`Bearer ${auth.token}`},
+        body:JSON.stringify(form)});
+      if(r.ok){setMsg({ok:true,t:'Профиль сохранён'});onSave({...auth,...form});}
+      else{const d=await r.json();setMsg({ok:false,t:d.error||'Ошибка'});}
+    }catch{setMsg({ok:false,t:'Ошибка сети'});}
+    setSaving(false);
+  }
+
+  return(
+    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal" style={{maxWidth:540}}>
+        <div className="modal-hd">
+          <div className="modal-hd-info"><div className="modal-hd-name">Мой профиль</div><div className="modal-hd-meta">Информация о вас и вашем бизнесе</div></div>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body" style={{display:'flex',flexDirection:'column',gap:14}}>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+            <div><label style={lbl}>Имя</label><input style={inp} value={form.full_name} onChange={e=>setForm(f=>({...f,full_name:e.target.value}))} placeholder="Иван Иванов"/></div>
+            <div><label style={lbl}>Компания</label><input style={inp} value={form.company} onChange={e=>setForm(f=>({...f,company:e.target.value}))} placeholder="ООО Пример"/></div>
+          </div>
+          <div><label style={lbl}>О себе</label><textarea style={{...inp,height:72,resize:'vertical'}} value={form.bio} onChange={e=>setForm(f=>({...f,bio:e.target.value}))} placeholder="Кратко о вас или вашем бизнесе…"/></div>
+          <div>
+            <label style={{...lbl,marginBottom:8}}>Соцсети и ссылки</label>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+              {[['instagram','📸 Instagram'],['telegram','✈️ Telegram'],['vk','💬 ВКонтакте'],['website','🌐 Сайт']].map(([k,l])=>(
+                <div key={k}><label style={{...lbl,fontSize:10}}>{l}</label><input style={inp} value={form.socials[k]||''} onChange={e=>setForm(f=>({...f,socials:{...f.socials,[k]:e.target.value}}))} placeholder={k==='website'?'https://...':'@username'}/></div>
+              ))}
+            </div>
+          </div>
+          {msg&&<div style={{padding:'8px 12px',borderRadius:6,background:msg.ok?'#f0fdf4':'#fff5f5',color:msg.ok?'#166534':'#991b1b',border:`1px solid ${msg.ok?'#86efac':'#fca5a5'}`,fontSize:12}}>{msg.t}</div>}
+        </div>
+        <div className="modal-ft"><button className="btn btn-primary" onClick={save} disabled={saving}>{saving?'Сохранение…':'Сохранить'}</button></div>
+      </div>
+    </div>
+  );
+}
+
+// ── Change Password Modal ─────────────────────────────────────────────────────
+function ChangePasswordModal({auth,isAdmin,onClose}){
+  const [form,setForm]=React.useState({new_password:'',repeat:''});
+  const [saving,setSaving]=React.useState(false);
+  const [msg,setMsg]=React.useState(null);
+  const inp={width:'100%',padding:'9px 12px',borderRadius:'var(--radius-sm)',border:'1px solid var(--line)',background:'var(--bg-page)',color:'var(--ink)',font:'inherit',fontSize:13,outline:'none',boxSizing:'border-box'};
+  const lbl={fontSize:11,fontWeight:600,color:'var(--ink-3)',textTransform:'uppercase',letterSpacing:'.05em',display:'block',marginBottom:4};
+
+  async function save(){
+    if(form.new_password!==form.repeat){setMsg({ok:false,t:'Пароли не совпадают'});return;}
+    if(form.new_password.length<6){setMsg({ok:false,t:'Минимум 6 символов'});return;}
+    setSaving(true);setMsg(null);
+    try{
+      const url=isAdmin?API_BASE+'/api/admin/password':API_BASE+'/api/auth/password';
+      const headers={'Content-Type':'application/json'};
+      if(isAdmin) headers['X-API-Secret']=auth.secret||'';
+      else headers['Authorization']=`Bearer ${auth.token}`;
+      const r=await fetch(url,{method:'PUT',headers,body:JSON.stringify({new_password:form.new_password})});
+      if(r.ok){setMsg({ok:true,t:'Пароль изменён'});setForm({new_password:'',repeat:''});}
+      else{const d=await r.json();setMsg({ok:false,t:d.error||'Ошибка'});}
+    }catch{setMsg({ok:false,t:'Ошибка сети'});}
+    setSaving(false);
+  }
+
+  return(
+    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal" style={{maxWidth:420}}>
+        <div className="modal-hd">
+          <div className="modal-hd-info"><div className="modal-hd-name">Смена пароля</div><div className="modal-hd-meta">{isAdmin?'Пароль администратора':'Ваш пароль входа'}</div></div>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body" style={{display:'flex',flexDirection:'column',gap:12}}>
+          <div><label style={lbl}>Новый пароль</label><input style={inp} type="password" value={form.new_password} onChange={e=>setForm(f=>({...f,new_password:e.target.value}))} autoFocus placeholder="••••••••"/></div>
+          <div><label style={lbl}>Повторите пароль</label><input style={inp} type="password" value={form.repeat} onChange={e=>setForm(f=>({...f,repeat:e.target.value}))} placeholder="••••••••"/></div>
+          {msg&&<div style={{padding:'8px 12px',borderRadius:6,background:msg.ok?'#f0fdf4':'#fff5f5',color:msg.ok?'#166534':'#991b1b',border:`1px solid ${msg.ok?'#86efac':'#fca5a5'}`,fontSize:12}}>{msg.t}</div>}
+        </div>
+        <div className="modal-ft"><button className="btn btn-primary" onClick={save} disabled={saving}>{saving?'…':'Изменить пароль'}</button></div>
+      </div>
+    </div>
+  );
+}
+
+// ── Onboarding Modal ──────────────────────────────────────────────────────────
+function OnboardingModal({auth,onClose,onSave}){
+  const [step,setStep]=React.useState(1);
+  const [form,setForm]=React.useState({full_name:auth.full_name||'',company:'',bio:'',socials:{instagram:'',telegram:'',vk:'',website:''}});
+  const [saving,setSaving]=React.useState(false);
+  const inp={width:'100%',padding:'9px 12px',borderRadius:'var(--radius-sm)',border:'1px solid var(--line)',background:'var(--bg-page)',color:'var(--ink)',font:'inherit',fontSize:13,outline:'none',boxSizing:'border-box'};
+  const lbl={fontSize:11,fontWeight:600,color:'var(--ink-3)',textTransform:'uppercase',letterSpacing:'.05em',display:'block',marginBottom:4};
+
+  async function finish(){
+    setSaving(true);
+    try{
+      await fetch(API_BASE+'/api/auth/profile',{method:'PUT',
+        headers:{'Content-Type':'application/json','Authorization':`Bearer ${auth.token}`},
+        body:JSON.stringify(form)});
+      onSave({...auth,...form});
+    }catch{}
+    setSaving(false);
+    onClose();
+  }
+
+  return(
+    <div className="modal-overlay">
+      <div className="modal" style={{maxWidth:500}}>
+        <div className="modal-hd" style={{background:'var(--bg-dg)',borderRadius:'var(--radius) var(--radius) 0 0'}}>
+          <div className="modal-hd-info">
+            <div className="modal-hd-name" style={{color:'#fff'}}>👋 Добро пожаловать!</div>
+            <div className="modal-hd-meta" style={{color:'rgba(255,255,255,.5)'}}>Шаг {step} из 2 — {step===1?'О вас':'О бизнесе'}</div>
+          </div>
+        </div>
+        <div style={{height:4,background:'var(--line)'}}><div style={{height:'100%',width:`${step*50}%`,background:'var(--accent)',transition:'width .3s ease',borderRadius:2}}/></div>
+        <div className="modal-body" style={{display:'flex',flexDirection:'column',gap:14,padding:'24px'}}>
+          {step===1?(<>
+            <div><label style={lbl}>Как вас зовут?</label><input style={inp} value={form.full_name} onChange={e=>setForm(f=>({...f,full_name:e.target.value}))} placeholder="Иван Иванов" autoFocus/></div>
+            <div><label style={lbl}>О себе <span style={{color:'var(--ink-4)',fontWeight:400,textTransform:'none',letterSpacing:0}}>(необязательно)</span></label><textarea style={{...inp,height:76,resize:'vertical'}} value={form.bio} onChange={e=>setForm(f=>({...f,bio:e.target.value}))} placeholder="Кратко о вас…"/></div>
+          </>):(<>
+            <div><label style={lbl}>Название компании</label><input style={inp} value={form.company} onChange={e=>setForm(f=>({...f,company:e.target.value}))} placeholder="ООО Пример" autoFocus/></div>
+            <div>
+              <label style={{...lbl,marginBottom:8}}>Соцсети <span style={{color:'var(--ink-4)',fontWeight:400,textTransform:'none',letterSpacing:0}}>(необязательно)</span></label>
+              <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                {[['instagram','📸 Instagram'],['telegram','✈️ Telegram'],['vk','💬 ВКонтакте'],['website','🌐 Сайт']].map(([k,l])=>(
+                  <div key={k} style={{display:'flex',alignItems:'center',gap:10}}>
+                    <span style={{fontSize:12,color:'var(--ink-3)',width:100,flexShrink:0}}>{l}</span>
+                    <input style={inp} value={form.socials[k]||''} onChange={e=>setForm(f=>({...f,socials:{...f.socials,[k]:e.target.value}}))} placeholder={k==='website'?'https://...':'@username'}/>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>)}
+        </div>
+        <div className="modal-ft" style={{justifyContent:'space-between'}}>
+          {step===2?<button className="btn btn-ghost" onClick={()=>setStep(1)}>← Назад</button>:<div/>}
+          {step===1
+            ?<button className="btn btn-primary" onClick={()=>setStep(2)}>Далее →</button>
+            :<button className="btn btn-primary" onClick={finish} disabled={saving}>{saving?'…':'Готово ✓'}</button>
+          }
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Users Management Tab (admin) ──────────────────────────────────────────────
+function UsersManagementTab({auth}){
+  const [users,setUsers]=React.useState([]);
+  const [loading,setLoading]=React.useState(false);
+  const [search,setSearch]=React.useState('');
+  const [selected,setSelected]=React.useState(null);
+
+  async function load(q=''){
+    setLoading(true);
+    try{
+      const r=await fetch(API_BASE+`/api/admin/users?search=${encodeURIComponent(q)}`,{headers:{'X-API-Secret':auth.secret||''}});
+      const d=await r.json();
+      setUsers(d.users||[]);
+    }catch{}
+    setLoading(false);
+  }
+
+  React.useEffect(()=>{load();},[]);
+
+  const searchTimer=React.useRef(null);
+  function handleSearch(e){
+    const v=e.target.value;
+    setSearch(v);
+    clearTimeout(searchTimer.current);
+    searchTimer.current=setTimeout(()=>load(v),300);
+  }
+
+  if(selected){
+    return(
+      <div>
+        <button className="btn btn-ghost btn-sm" style={{marginBottom:20}} onClick={()=>setSelected(null)}>← Все пользователи</button>
+        <div style={{display:'grid',gridTemplateColumns:'280px 1fr',gap:24,alignItems:'start'}}>
+          {/* User info card */}
+          <div style={{background:'var(--bg-card)',border:'1px solid var(--line)',borderRadius:'var(--radius)',padding:'22px',boxShadow:'var(--shadow)',display:'flex',flexDirection:'column',gap:14,position:'sticky',top:120}}>
+            <div style={{display:'flex',alignItems:'center',gap:14}}>
+              <div style={{width:52,height:52,borderRadius:'50%',background:'linear-gradient(135deg,#1db954,#0d7a38)',display:'grid',placeItems:'center',fontSize:20,fontWeight:700,color:'#fff',flexShrink:0,boxShadow:'0 3px 10px rgba(29,185,84,.3)'}}>
+                {(selected.full_name||selected.phone||'?').slice(0,2).toUpperCase()}
+              </div>
+              <div>
+                <div style={{fontWeight:700,fontSize:16,lineHeight:1.2}}>{selected.full_name||'—'}</div>
+                <div style={{fontSize:12,color:'var(--ink-3)',marginTop:3}}>{selected.company||''}</div>
+              </div>
+            </div>
+            <div style={{display:'flex',flexDirection:'column',gap:6,fontSize:12,color:'var(--ink-3)'}}>
+              <div>📞 {selected.phone||'—'}</div>
+              {selected.email&&<div>✉️ {selected.email}</div>}
+              {selected.bio&&<div style={{color:'var(--ink-2)',marginTop:6,lineHeight:1.6,fontSize:12}}>{selected.bio}</div>}
+            </div>
+            {selected.socials&&Object.entries(selected.socials).filter(([,v])=>v).length>0&&(
+              <div style={{display:'flex',flexDirection:'column',gap:5,borderTop:'1px solid var(--line)',paddingTop:12}}>
+                {Object.entries(selected.socials).filter(([,v])=>v).map(([k,v])=>(
+                  <div key={k} style={{fontSize:11,color:'var(--ink-3)'}}>{k}: <span style={{color:'var(--accent)',fontWeight:500}}>{v}</span></div>
+                ))}
+              </div>
+            )}
+            <div style={{borderTop:'1px solid var(--line)',paddingTop:12,display:'flex',flexDirection:'column',gap:6}}>
+              <div style={{fontSize:11,color:'var(--ink-4)'}}>Зарегистрирован: {fmtDate(selected.created_at)}</div>
+              <span style={{display:'inline-flex',padding:'3px 10px',borderRadius:999,fontSize:11,fontWeight:600,alignSelf:'flex-start',
+                background:selected.is_active?'#f0fdf4':'#fff5f5',
+                color:selected.is_active?'#166534':'#991b1b',
+                border:`1px solid ${selected.is_active?'#86efac':'#fca5a5'}`}}>
+                {selected.is_active?'✓ Активен':'✗ Заблокирован'}
+              </span>
+            </div>
+          </div>
+
+          {/* Business stats */}
+          <div>
+            {selected.business_name?(
+              <div>
+                <div style={{fontSize:14,fontWeight:650,marginBottom:16,display:'flex',alignItems:'center',gap:8}}>
+                  <span>📊</span> Статистика бизнеса: <span style={{color:'var(--accent)'}}>{selected.business_name}</span>
+                </div>
+                <OverviewTab auth={auth} period="all" bizFilter={selected.business_name} allBusinesses={[]}/>
+              </div>
+            ):(
+              <div style={{background:'var(--bg-card)',border:'1px solid var(--line)',borderRadius:'var(--radius)',padding:'56px',textAlign:'center',color:'var(--ink-4)',boxShadow:'var(--shadow)'}}>
+                <div style={{fontSize:36,marginBottom:14}}>🏢</div>
+                <div style={{fontSize:15,fontWeight:600,color:'var(--ink-3)'}}>Бизнес не привязан</div>
+                <div style={{fontSize:12,marginTop:8,lineHeight:1.6}}>Привяжите бизнес к пользователю через<br/>настройки платформы</div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return(
+    <div>
+      <div style={{display:'flex',gap:12,marginBottom:20,alignItems:'center'}}>
+        <input
+          style={{flex:1,height:40,padding:'0 16px',borderRadius:'var(--radius-sm)',border:'1px solid var(--line)',background:'var(--bg-card)',color:'var(--ink)',font:'inherit',fontSize:13,outline:'none',transition:'border-color .15s,box-shadow .15s'}}
+          placeholder="🔍 Поиск по имени или телефону…"
+          value={search} onChange={handleSearch}
+        />
+        <button className="btn btn-ghost btn-sm" onClick={()=>load(search)}><IcoRefresh/> Обновить</button>
+        <span style={{fontSize:12,color:'var(--ink-3)',whiteSpace:'nowrap',background:'var(--bg-card)',border:'1px solid var(--line)',padding:'4px 10px',borderRadius:6}}>{users.length} пользователей</span>
+      </div>
+
+      {loading?<div className="spinner-wrap"><div className="spinner"/><span>Загрузка…</span></div>
+      :users.length===0?<div style={{textAlign:'center',padding:56,color:'var(--ink-4)',fontSize:13}}>Пользователи не найдены</div>
+      :<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:14}}>
+        {users.map(u=>(
+          <div key={u.id} className="user-card" onClick={()=>setSelected(u)}>
+            <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:10}}>
+              <div style={{width:42,height:42,borderRadius:'50%',background:'linear-gradient(135deg,#1db954,#0d7a38)',display:'grid',placeItems:'center',fontSize:15,fontWeight:700,color:'#fff',flexShrink:0,boxShadow:'0 2px 8px rgba(29,185,84,.25)'}}>
+                {(u.full_name||u.phone||'?').slice(0,2).toUpperCase()}
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontWeight:600,fontSize:13,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{u.full_name||'—'}</div>
+                <div style={{fontSize:11,color:'var(--ink-3)',marginTop:1}}>{u.phone||u.email||''}</div>
+              </div>
+              <span style={{fontSize:10,fontWeight:600,padding:'2px 8px',borderRadius:999,flexShrink:0,
+                background:u.is_active?'#f0fdf4':'#fff5f5',
+                color:u.is_active?'#166534':'#991b1b',
+                border:`1px solid ${u.is_active?'#86efac':'#fca5a5'}`}}>
+                {u.is_active?'Активен':'Откл'}
+              </span>
+            </div>
+            {u.company&&<div style={{fontSize:12,color:'var(--ink-3)',marginBottom:6}}>🏢 {u.company}</div>}
+            {u.bio&&<div style={{fontSize:11,color:'var(--ink-4)',marginBottom:6,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{u.bio}</div>}
+            {u.business_name
+              ?<div style={{fontSize:11,display:'inline-flex',alignItems:'center',gap:5,padding:'3px 9px',borderRadius:6,background:'#f0faf4',color:'var(--ink-2)',border:'1px solid var(--line)',marginTop:4}}>📡 {u.business_name}</div>
+              :<div style={{fontSize:11,color:'var(--ink-4)',marginTop:4}}>Бизнес не привязан</div>
+            }
+            <div style={{fontSize:10,color:'var(--ink-4)',marginTop:10,borderTop:'1px solid var(--line)',paddingTop:8}}>С {fmtDate(u.created_at)}</div>
+          </div>
+        ))}
+      </div>}
+    </div>
+  );
+}
+
 // ── Admin Platform ────────────────────────────────────────────────────────────
 function AdminPlatform({auth,onLogout}){
   const [tab,setTab]=React.useState('overview');
@@ -1538,6 +1883,7 @@ function AdminPlatform({auth,onLogout}){
   const [businesses,setBusinesses]=React.useState([]);
   const [lastRefresh,setLastRefresh]=React.useState(null);
   const [showPlatform,setShowPlatform]=React.useState(false);
+  const [showChangePw,setShowChangePw]=React.useState(false);
 
   function reloadBusinesses(){
     fetch(API_BASE+'/api/businesses',{headers:{'X-API-Secret':auth.secret||''}})
@@ -1548,13 +1894,16 @@ function AdminPlatform({auth,onLogout}){
     setLastRefresh(new Date());
   },[]);
 
+  const noControls=tab==='settings'||tab==='management';
+
   const tabs=[
-    {key:'overview',   label:'Обзор'},
-    {key:'leads',      label:'Лиды'},
-    {key:'bookings',   label:'Бронирования'},
-    {key:'analytics',  label:'Аналитика'},
-    {key:'telephony',  label:'Телефония'},
-    {key:'settings',   label:'Настройки'},
+    {key:'overview',    label:'Обзор'},
+    {key:'leads',       label:'Лиды'},
+    {key:'bookings',    label:'Бронирования'},
+    {key:'analytics',   label:'Аналитика'},
+    {key:'telephony',   label:'Телефония'},
+    {key:'management',  label:'Управление'},
+    {key:'settings',    label:'Настройки'},
   ];
 
   return(
@@ -1575,12 +1924,12 @@ function AdminPlatform({auth,onLogout}){
             </div>
             <button className="hdr-btn" onClick={()=>setLastRefresh(new Date())}><IcoRefresh/> Обновить</button>
             <button className="hdr-btn" onClick={()=>setShowPlatform(true)}>⚙️ Платформа</button>
-            <button className="hdr-btn" onClick={onLogout} style={{color:'rgba(252,165,165,.7)'}}>Выйти</button>
+            <ProfileDropdown auth={auth} onLogout={onLogout} onEditProfile={()=>{}} onChangePassword={()=>setShowChangePw(true)}/>
           </div>
         </div>
       </header>
 
-      {tab!=='settings'&&(
+      {!noControls&&(
         <div className="controls">
           <div className="controls-inner">
             <span className="ctrl-label">Бизнес:</span>
@@ -1608,12 +1957,14 @@ function AdminPlatform({auth,onLogout}){
       </nav>
 
       {showPlatform&&<PlatformModal auth={auth} onClose={()=>{setShowPlatform(false);reloadBusinesses();}}/>}
+      {showChangePw&&<ChangePasswordModal auth={auth} isAdmin={true} onClose={()=>setShowChangePw(false)}/>}
 
       <div className="page">
-        {tab==='overview'  &&<OverviewTab  auth={auth} period={period} bizFilter={bizFilter==='all'?'':bizFilter} allBusinesses={businesses}/>}
-        {tab==='leads'     &&<LeadsTab     auth={auth}/>}
-        {tab==='bookings'  &&<BookingsTab  auth={auth}/>}
-        {tab==='analytics' &&<AnalyticsTab auth={auth}/>}
+        {tab==='overview'   &&<OverviewTab         auth={auth} period={period} bizFilter={bizFilter==='all'?'':bizFilter} allBusinesses={businesses}/>}
+        {tab==='leads'      &&<LeadsTab            auth={auth}/>}
+        {tab==='bookings'   &&<BookingsTab         auth={auth}/>}
+        {tab==='analytics'  &&<AnalyticsTab        auth={auth}/>}
+        {tab==='management' &&<UsersManagementTab  auth={auth}/>}
         {tab==='telephony'&&(
           <div className="coming-card">
             <div className="coming-icon">📞</div>
@@ -1629,30 +1980,84 @@ function AdminPlatform({auth,onLogout}){
 }
 
 // ── User Cabinet ──────────────────────────────────────────────────────────────
-function UserCabinet({auth,onLogout}){
-  const name=auth.full_name||auth.email||auth.phone||'Пользователь';
+function UserCabinet({auth:initialAuth,onLogout}){
+  const [authData,setAuthData]=React.useState(initialAuth);
+  const [tab,setTab]=React.useState('overview');
+  const [period,setPeriod]=React.useState('week');
+  const [showProfile,setShowProfile]=React.useState(false);
+  const [showChangePw,setShowChangePw]=React.useState(false);
+  const [showOnboarding,setShowOnboarding]=React.useState(!initialAuth.full_name);
+
+  const bizName=authData.business_name||'';
+
+  const tabs=[
+    {key:'overview',   label:'Обзор'},
+    {key:'leads',      label:'Лиды'},
+    {key:'bookings',   label:'Бронирования'},
+    {key:'analytics',  label:'Аналитика'},
+  ];
+
+  function handleSave(updated){
+    setAuthData(updated);
+    saveAuth(updated);
+  }
+
   return(
     <div className="shell">
       <header className="header">
         <div className="header-inner">
           <div className="logo-wrap">
             <div className="logo-mark">C</div>
-            <div><div className="logo-text">Calvix <span>AI</span></div><div className="logo-sub">{auth.business_name||'Личный кабинет'}</div></div>
+            <div>
+              <div className="logo-text">Calvix <span>AI</span></div>
+              <div className="logo-sub">{authData.business_name||'Личный кабинет'}</div>
+            </div>
           </div>
           <div className="header-right">
-            <div className="live-badge"><span className="live-dot"/>{name}</div>
-            <button className="hdr-btn" onClick={onLogout} style={{color:'rgba(252,165,165,.7)'}}>Выйти</button>
+            <ProfileDropdown auth={authData} onLogout={onLogout} onEditProfile={()=>setShowProfile(true)} onChangePassword={()=>setShowChangePw(true)}/>
           </div>
         </div>
       </header>
-      <div className="page">
-        <div className="coming-card">
-          <div className="coming-icon">🚀</div>
-          <div className="coming-title">Добро пожаловать{auth.full_name?`, ${auth.full_name}`:''}!</div>
-          <div className="coming-sub">{auth.business_name?<>Кабинет бизнеса <strong>«{auth.business_name}»</strong>.<br/>Разделы появятся в ближайшее время.</>:<>Обратитесь к администратору чтобы привязать бизнес.</>}</div>
-          <span className="coming-badge">Скоро</span>
+
+      {tab!=='settings'&&(
+        <div className="controls">
+          <div className="controls-inner">
+            <span className="ctrl-label">Период:</span>
+            <div className="seg">
+              {[['today','Сегодня'],['week','Неделя'],['month','Месяц'],['all','Всё время']].map(([v,l])=>(
+                <button key={v} className={period===v?'on':''} onClick={()=>setPeriod(v)}>{l}</button>
+              ))}
+            </div>
+            <div className="ctrl-spacer"/>
+            {bizName&&<span style={{fontSize:11,color:'rgba(255,255,255,.35)',borderLeft:'1px solid rgba(255,255,255,.12)',paddingLeft:12}}>📡 {bizName}</span>}
+          </div>
         </div>
+      )}
+
+      <nav className="nav-bar">
+        <div className="nav-bar-inner">
+          {tabs.map(t=>(
+            <button key={t.key} className={`nav-tab${tab===t.key?' active':''}`} onClick={()=>setTab(t.key)}>{t.label}</button>
+          ))}
+        </div>
+      </nav>
+
+      <div className="page">
+        {!bizName&&tab==='overview'&&(
+          <div style={{background:'#fffbe6',border:'1px solid #ffe58f',borderRadius:'var(--radius)',padding:'14px 20px',marginBottom:20,fontSize:13,color:'#92400e',display:'flex',alignItems:'center',gap:10}}>
+            <span>⚠️</span>
+            <span>Бизнес не привязан к вашему аккаунту. Обратитесь к администратору для настройки доступа.</span>
+          </div>
+        )}
+        {tab==='overview'  &&<OverviewTab  auth={authData} period={period} bizFilter={bizName} allBusinesses={[]}/>}
+        {tab==='leads'     &&<LeadsTab     auth={authData}/>}
+        {tab==='bookings'  &&<BookingsTab  auth={authData}/>}
+        {tab==='analytics' &&<AnalyticsTab auth={authData}/>}
       </div>
+
+      {showOnboarding&&<OnboardingModal auth={authData} onClose={()=>setShowOnboarding(false)} onSave={handleSave}/>}
+      {showProfile&&<ProfileModal auth={authData} onClose={()=>setShowProfile(false)} onSave={handleSave}/>}
+      {showChangePw&&<ChangePasswordModal auth={authData} isAdmin={false} onClose={()=>setShowChangePw(false)}/>}
     </div>
   );
 }

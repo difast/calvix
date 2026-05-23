@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey
 from sqlalchemy.sql import func
 from bot.models.database import Base
 
@@ -12,6 +12,9 @@ class User(Base):
     password_hash = Column(String(512), nullable=False)
     business_id = Column(Integer, ForeignKey("businesses.id", ondelete="SET NULL"), nullable=True)
     full_name = Column(String(255), nullable=True)
+    company = Column(String(255), nullable=True)
+    socials = Column(Text, nullable=True)
+    bio = Column(Text, nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, server_default=func.now())
 
