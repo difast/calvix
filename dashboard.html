@@ -57,7 +57,7 @@ html,body{
 }
 .header-inner{
   max-width:1440px; width:100%; margin:0 auto;
-  display:flex; align-items:center; justify-content:center; position:relative;
+  display:flex; align-items:center; justify-content:flex-start; position:relative;
 }
 .logo-wrap{display:flex;align-items:center;gap:10px;}
 .logo-mark{
@@ -563,90 +563,143 @@ function OverviewTab({auth,period,bizFilter}){
   const [hotLeads,setHotLeads]=React.useState([]);
   const [bookings,setBookings]=React.useState([]);
   const [loading,setLoading]=React.useState(false);
+  const [platform,setPlatform]=React.useState(null);
+  const [businesses,setBusinesses]=React.useState([]);
 
   async function load(){
     setLoading(true);
     const dateFrom=period==='today'?todayISO():period==='week'?weekAgo():period==='month'?monthAgo():null;
     const bq=bizFilter?{business_name:`eq.${bizFilter}`}:{};
-    const [cAll,cHot,cToday,cBook,rLeads,rBook]=await Promise.all([
+    const [cAll,cHot,cToday,cBook,rLeads,rBook,rPlatform,rBiz]=await Promise.all([
       sbCount('hot_leads',{...bq}),
       sbCount('hot_leads',{...bq,status:'eq.HOT'}),
       sbCount('hot_leads',{...bq,'created_at':`gte.${todayISO()}`}),
-      sbCount('bookings', {...bq}),
+      sbCount('bookings',{...bq}),
       sbGet('hot_leads',{select:'*',status:'eq.HOT',order:'created_at.desc',limit:10,...bq,...(dateFrom?{'created_at':`gte.${dateFrom}`}:{})}),
-      sbGet('bookings', {select:'*',order:'created_at.desc',limit:10,...bq}),
+      sbGet('bookings',{select:'*',order:'created_at.desc',limit:10,...bq}),
+      fetch(API_BASE+'/api/platform/status',{headers:{'X-API-Secret':auth?.secret||''}}).then(r=>r.ok?r.json():null).catch(()=>null),
+      fetch(API_BASE+'/api/businesses',{headers:{'X-API-Secret':auth?.secret||''}}).then(r=>r.ok?r.json():null).catch(()=>null),
     ]);
     setKpi({total:cAll,hot:cHot,bookings:cBook,today:cToday});
     setHotLeads(rLeads.data);
     setBookings(rBook.data);
+    setPlatform(rPlatform);
+    setBusinesses(rBiz?.businesses||[]);
     setLoading(false);
   }
 
   React.useEffect(()=>{load();},[period,bizFilter]);
 
+  const onlineIds=new Set((platform?.bots||[]).filter(b=>b.online).map(b=>b.id));
+
   return(
-    <div>
-      <div className="kpi-grid">
-        <KpiCard label="Всего лидов"       value={kpi.total}    emoji="👥" color="var(--c4)" bg="var(--c4d)"/>
-        <KpiCard label="HOT лидов"         value={kpi.hot}      emoji="🔥" color="var(--c3)" bg="var(--c3d)"/>
-        <KpiCard label="Записей на созвон" value={kpi.bookings} emoji="📅" color="var(--c2)" bg="var(--c2d)"/>
-        <KpiCard label="Новых сегодня"     value={kpi.today}    emoji="⚡" color="var(--c1)" bg="var(--c1d)"/>
-      </div>
+    <div style={{display:'grid',gridTemplateColumns:'1fr 320px',gap:24,alignItems:'start'}}>
+      <div>
+        <div className="kpi-grid">
+          <KpiCard label="Всего лидов"       value={kpi.total}    emoji="👥" color="var(--c4)" bg="var(--c4d)"/>
+          <KpiCard label="HOT лидов"         value={kpi.hot}      emoji="🔥" color="var(--c3)" bg="var(--c3d)"/>
+          <KpiCard label="Записей на созвон" value={kpi.bookings} emoji="📅" color="var(--c2)" bg="var(--c2d)"/>
+          <KpiCard label="Новых сегодня"     value={kpi.today}    emoji="⚡" color="var(--c1)" bg="var(--c1d)"/>
+        </div>
 
-      <div className="section">
-        <div className="section-hd">
-          <div className="section-title">🔥 HOT Лиды</div>
-          <span className="count-badge">{hotLeads.length}</span>
+        <div className="section">
+          <div className="section-hd">
+            <div className="section-title">🔥 HOT Лиды</div>
+            <span className="count-badge">{hotLeads.length}</span>
+          </div>
+          <div className="table-wrap">
+            {loading?<div className="spinner-wrap"><div className="spinner"/><span>Загрузка…</span></div>
+            :<div className="table-scroll"><table>
+              <thead><tr><th>Бизнес</th><th>Имя</th><th>Никнейм</th><th>Телефон</th><th>Создан</th></tr></thead>
+              <tbody>
+                {hotLeads.length===0?<tr><td className="empty-state" colSpan="5">Нет HOT лидов за период</td></tr>
+                :hotLeads.map(r=>(
+                  <tr key={r.id}>
+                    <td><span className="chip-biz">{r.business_name||'—'}</span></td>
+                    <td className="td-name">{r.full_name||'—'}</td>
+                    <td className="td-nick">{r.username?`@${r.username}`:'—'}</td>
+                    <td className="td-phone">{r.phone||'—'}</td>
+                    <td className="td-date">{fmtDate(r.created_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table></div>}
+          </div>
         </div>
-        <div className="table-wrap">
-          {loading?<div className="spinner-wrap"><div className="spinner"/><span>Загрузка…</span></div>
-          :<div className="table-scroll"><table>
-            <thead><tr><th>Бизнес</th><th>Имя</th><th>Никнейм</th><th>Телефон</th><th>Последняя активность</th><th>Создан</th></tr></thead>
-            <tbody>
-              {hotLeads.length===0?<tr><td className="empty-state" colSpan="6">Нет HOT лидов за период</td></tr>
-              :hotLeads.map(r=>(
-                <tr key={r.id}>
-                  <td><span className="chip-biz">{r.business_name||'—'}</span></td>
-                  <td className="td-name">{r.full_name||'—'}</td>
-                  <td className="td-nick">{r.username?`@${r.username}`:'—'}</td>
-                  <td className="td-phone">{r.phone||'—'}</td>
-                  <td className="td-date">{fmtDT(r.last_active)}</td>
-                  <td className="td-date">{fmtDate(r.created_at)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table></div>}
-        </div>
-      </div>
 
-      <div className="section">
-        <div className="section-hd">
-          <div className="section-title">📅 Записи на созвон</div>
-          <span className="count-badge">{bookings.length}</span>
-        </div>
-        <div className="table-wrap">
-          {loading?<div className="spinner-wrap"><div className="spinner"/><span>Загрузка…</span></div>
-          :<div className="table-scroll"><table>
-            <thead><tr><th>Бизнес</th><th>Имя</th><th>Никнейм</th><th>Телефон</th><th>Время созвона</th><th>Статус</th><th>Дата записи</th></tr></thead>
-            <tbody>
-              {bookings.length===0?<tr><td className="empty-state" colSpan="7">Нет записей</td></tr>
-              :bookings.map(b=>{
-                const si={pending:{l:'Ожидает',c:'badge-pending'},done:{l:'Проведён',c:'badge-done'},cancelled:{l:'Отменён',c:'badge-cancelled'}}[b.status]||{l:'Ожидает',c:'badge-pending'};
-                return(
+        <div className="section">
+          <div className="section-hd">
+            <div className="section-title">📅 Записи на созвон</div>
+            <span className="count-badge">{bookings.length}</span>
+          </div>
+          <div className="table-wrap">
+            {loading?<div className="spinner-wrap"><div className="spinner"/><span>Загрузка…</span></div>
+            :<div className="table-scroll"><table>
+              <thead><tr><th>Бизнес</th><th>Имя</th><th>Телефон</th><th>Время созвона</th><th>Дата</th></tr></thead>
+              <tbody>
+                {bookings.length===0?<tr><td className="empty-state" colSpan="5">Нет записей</td></tr>
+                :bookings.map(b=>(
                   <tr key={b.id}>
                     <td><span className="chip-biz">{b.business_name||'—'}</span></td>
                     <td className="td-name">{b.full_name||'—'}</td>
-                    <td className="td-nick">{b.username?`@${b.username}`:'—'}</td>
                     <td className="td-phone">{b.phone||'—'}</td>
                     <td className="td-time">{fmtDT(b.scheduled_at)||b.scheduled_at||'—'}</td>
-                    <td><span className={`badge ${si.c}`}>{si.l}</span></td>
                     <td className="td-date">{fmtDate(b.created_at)}</td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table></div>}
+                ))}
+              </tbody>
+            </table></div>}
+          </div>
         </div>
+      </div>
+
+      <div style={{display:'flex',flexDirection:'column',gap:14,position:'sticky',top:120}}>
+        <div style={{background:'var(--bg-dg)',borderRadius:'var(--radius)',padding:'18px 20px',boxShadow:'var(--shadow-lg)'}}>
+          <div style={{fontSize:12,fontWeight:700,marginBottom:14,color:'#4ade80',textTransform:'uppercase',letterSpacing:'.06em'}}>🤖 Платформа</div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:0}}>
+            {[
+              {l:'Лидов',v:platform?.total_leads??kpi.total,c:'#60a5fa'},
+              {l:'HOT',v:platform?.total_hot??kpi.hot,c:'#fb923c'},
+              {l:'Записей',v:platform?.total_bookings??kpi.bookings,c:'#a78bfa'},
+              {l:'Онлайн',v:platform?.active_bots??'—',c:'#4ade80'},
+            ].map(s=>(
+              <div key={s.l} style={{background:'rgba(255,255,255,.06)',borderRadius:8,padding:'10px 12px',textAlign:'center'}}>
+                <div className="mono" style={{fontSize:20,fontWeight:700,color:s.c,lineHeight:1}}>{s.v??'—'}</div>
+                <div style={{fontSize:10,color:'rgba(255,255,255,.35)',marginTop:4,textTransform:'uppercase',letterSpacing:'.05em'}}>{s.l}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div style={{fontSize:11,fontWeight:600,color:'var(--ink-3)',textTransform:'uppercase',letterSpacing:'.05em',paddingLeft:2}}>Бизнесы</div>
+        {businesses.length===0
+          ?<div style={{background:'var(--bg-card)',border:'1px solid var(--line)',borderRadius:'var(--radius)',padding:20,textAlign:'center',color:'var(--ink-4)',fontSize:12}}>Нет данных</div>
+          :businesses.map(b=>{
+            const online=onlineIds.has(b.id);
+            return(
+              <div key={b.id} style={{background:'var(--bg-card)',border:'1px solid var(--line)',borderRadius:'var(--radius)',padding:'14px 16px',boxShadow:'var(--shadow)'}}>
+                <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
+                  <span style={{fontWeight:600,fontSize:13,flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{b.name}</span>
+                  <span style={{display:'inline-flex',alignItems:'center',gap:3,padding:'2px 7px',borderRadius:999,fontSize:10,fontWeight:700,
+                    background:online?'#f0fdf4':'#f8fafc',color:online?'#166534':'var(--ink-4)',
+                    border:`1px solid ${online?'#86efac':'var(--line)'}`}}>
+                    <span style={{width:5,height:5,borderRadius:'50%',background:online?'#22c55e':'#cbd5e1',display:'inline-block'}}/>
+                    {online?'Online':'Offline'}
+                  </span>
+                </div>
+                <div style={{display:'flex',gap:0,borderRadius:8,overflow:'hidden',border:'1px solid var(--line)'}}>
+                  {[{l:'Лиды',v:b.stats?.total_leads??0,c:'var(--c4)'},{l:'HOT',v:b.stats?.hot_leads??0,c:'var(--c3)'},{l:'Записи',v:b.stats?.bookings??0,c:'var(--c2)'}].map((s,i)=>(
+                    <div key={s.l} style={{flex:1,textAlign:'center',padding:'8px 4px',background:i%2===0?'var(--bg-page)':'var(--bg-card)',borderRight:i<2?'1px solid var(--line)':'none'}}>
+                      <div style={{fontWeight:700,fontSize:16,color:s.c,lineHeight:1}}>{s.v}</div>
+                      <div style={{fontSize:9,color:'var(--ink-4)',textTransform:'uppercase',letterSpacing:'.04em',marginTop:3}}>{s.l}</div>
+                    </div>
+                  ))}
+                </div>
+                {!b.is_active&&<div style={{marginTop:8,padding:'4px 8px',borderRadius:6,background:'#fff5f5',color:'#991b1b',fontSize:11,fontWeight:600,border:'1px solid #fca5a5',textAlign:'center'}}>⏸ Бот отключён</div>}
+              </div>
+            );
+          })
+        }
       </div>
     </div>
   );
@@ -1250,7 +1303,7 @@ function PlatformModal({auth,onClose}){
           <button className="modal-close" onClick={onClose} style={{background:'rgba(255,255,255,.1)',color:'#fff',border:'1px solid rgba(255,255,255,.2)'}}>×</button>
         </div>
         <div className="modal-body" style={{padding:24}}>
-          {view==='list'?<ListView/>:<FormView/>}
+          {view==='list'?ListView():FormView()}
         </div>
       </div>
     </div>
@@ -1303,7 +1356,7 @@ function AdminPlatform({auth,onLogout}){
         </div>
       </header>
 
-      {tab==='overview'&&(
+      {tab!=='settings'&&(
         <div className="controls">
           <div className="controls-inner">
             <span className="ctrl-label">Бизнес:</span>
