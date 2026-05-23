@@ -151,6 +151,8 @@ select.sel option{background:#0d2b1f;color:#fff;}
 .kpi-card:hover{transform:translateY(-3px);box-shadow:0 8px 28px rgba(13,43,31,.13);border-color:var(--kpi-color);}
 .stat-mini{transition:transform .18s ease,box-shadow .18s ease,background .18s ease;}
 .stat-mini:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(13,43,31,.11);}
+.analytics-card{transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease;}
+.analytics-card:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(13,43,31,.12);border-color:rgba(22,163,74,.3);}
 .biz-card{transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease;}
 .biz-card:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(13,43,31,.1);border-color:rgba(22,163,74,.4);}
 .kpi-card::after{
@@ -564,19 +566,18 @@ function LeadHistoryModal({lead,auth,onClose,onStatusChange}){
 }
 
 // ── Overview Tab ──────────────────────────────────────────────────────────────
-function OverviewTab({auth,period,bizFilter}){
+function OverviewTab({auth,period,bizFilter,allBusinesses=[]}){
   const [kpi,setKpi]=React.useState({total:null,hot:null,bookings:null,today:null});
   const [hotLeads,setHotLeads]=React.useState([]);
   const [bookings,setBookings]=React.useState([]);
   const [loading,setLoading]=React.useState(false);
   const [platform,setPlatform]=React.useState(null);
-  const [businesses,setBusinesses]=React.useState([]);
 
   async function load(){
     setLoading(true);
     const dateFrom=period==='today'?todayISO():period==='week'?weekAgo():period==='month'?monthAgo():null;
     const bq=bizFilter?{business_name:`eq.${bizFilter}`}:{};
-    const [cAll,cHot,cToday,cBook,rLeads,rBook,rPlatform,rBiz]=await Promise.all([
+    const [cAll,cHot,cToday,cBook,rLeads,rBook,rPlatform]=await Promise.all([
       sbCount('hot_leads',{...bq}),
       sbCount('hot_leads',{...bq,status:'eq.HOT'}),
       sbCount('hot_leads',{...bq,'created_at':`gte.${todayISO()}`}),
@@ -584,13 +585,11 @@ function OverviewTab({auth,period,bizFilter}){
       sbGet('hot_leads',{select:'*',status:'eq.HOT',order:'created_at.desc',limit:10,...bq,...(dateFrom?{'created_at':`gte.${dateFrom}`}:{})}),
       sbGet('bookings',{select:'*',order:'created_at.desc',limit:10,...bq}),
       fetch(API_BASE+'/api/platform/status',{headers:{'X-API-Secret':auth?.secret||''}}).then(r=>r.ok?r.json():null).catch(()=>null),
-      fetch(API_BASE+'/api/businesses',{headers:{'X-API-Secret':auth?.secret||''}}).then(r=>r.ok?r.json():null).catch(()=>null),
     ]);
     setKpi({total:cAll,hot:cHot,bookings:cBook,today:cToday});
     setHotLeads(rLeads.data);
     setBookings(rBook.data);
     setPlatform(rPlatform);
-    setBusinesses(rBiz?.businesses||[]);
     setLoading(false);
   }
 
@@ -660,27 +659,39 @@ function OverviewTab({auth,period,bizFilter}){
       </div>
 
       <div style={{display:'flex',flexDirection:'column',gap:14,position:'sticky',top:120}}>
+        {/* Статистика из Supabase */}
         <div style={{background:'var(--bg-dg)',borderRadius:'var(--radius)',padding:'18px 20px',boxShadow:'var(--shadow-lg)'}}>
-          <div style={{fontSize:12,fontWeight:700,marginBottom:14,color:'#4ade80',textTransform:'uppercase',letterSpacing:'.06em'}}>🤖 Платформа</div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:0}}>
+          <div style={{fontSize:12,fontWeight:700,marginBottom:4,color:'#4ade80',textTransform:'uppercase',letterSpacing:'.06em'}}>📊 Итого по платформе</div>
+          <div style={{fontSize:10,color:'rgba(255,255,255,.3)',marginBottom:12}}>Данные из Supabase · все бизнесы</div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
             {[
-              {l:'Лидов',v:platform?.total_leads??kpi.total,c:'#60a5fa'},
-              {l:'HOT',v:platform?.total_hot??kpi.hot,c:'#fb923c'},
-              {l:'Записей',v:platform?.total_bookings??kpi.bookings,c:'#a78bfa'},
-              {l:'Онлайн',v:platform?.active_bots??'—',c:'#4ade80'},
+              {l:'Всего лидов',v:kpi.total,c:'#60a5fa',e:'👥'},
+              {l:'HOT лидов',v:kpi.hot,c:'#fb923c',e:'🔥'},
+              {l:'Записей',v:kpi.bookings,c:'#a78bfa',e:'📅'},
+              {l:'Новых сегодня',v:kpi.today,c:'#4ade80',e:'⚡'},
             ].map(s=>(
               <div key={s.l} className="stat-mini" style={{background:'rgba(255,255,255,.06)',borderRadius:8,padding:'10px 12px',textAlign:'center',cursor:'default'}}>
-                <div className="mono" style={{fontSize:20,fontWeight:700,color:s.c,lineHeight:1}}>{s.v??'—'}</div>
-                <div style={{fontSize:10,color:'rgba(255,255,255,.35)',marginTop:4,textTransform:'uppercase',letterSpacing:'.05em'}}>{s.l}</div>
+                <div style={{fontSize:14,marginBottom:4}}>{s.e}</div>
+                <div className="mono" style={{fontSize:18,fontWeight:700,color:s.c,lineHeight:1}}>{s.v??'—'}</div>
+                <div style={{fontSize:9,color:'rgba(255,255,255,.3)',marginTop:4,letterSpacing:'.04em'}}>{s.l}</div>
               </div>
             ))}
           </div>
+          {platform&&(
+            <div style={{marginTop:10,paddingTop:10,borderTop:'1px solid rgba(255,255,255,.08)',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+              <span style={{fontSize:11,color:'rgba(255,255,255,.3)'}}>Ботов онлайн</span>
+              <span style={{fontSize:13,fontWeight:700,color:'#4ade80'}}>{platform.active_bots??'—'} / {allBusinesses.length}</span>
+            </div>
+          )}
         </div>
 
-        <div style={{fontSize:11,fontWeight:600,color:'var(--ink-3)',textTransform:'uppercase',letterSpacing:'.05em',paddingLeft:2}}>Бизнесы <span style={{color:'var(--ink-4)',fontWeight:400,textTransform:'none',fontSize:10}}>({businesses.length})</span></div>
-        {businesses.length===0
-          ?<div style={{background:'var(--bg-card)',border:'1px solid var(--line)',borderRadius:'var(--radius)',padding:20,textAlign:'center',color:'var(--ink-4)',fontSize:12}}>Нет данных</div>
-          :businesses.map(b=>{
+        {/* Список ботов */}
+        <div style={{fontSize:11,fontWeight:600,color:'var(--ink-3)',textTransform:'uppercase',letterSpacing:'.05em',paddingLeft:2}}>
+          Боты <span style={{color:'var(--ink-4)',fontWeight:400,textTransform:'none',fontSize:10}}>· {allBusinesses.length} подключено</span>
+        </div>
+        {allBusinesses.length===0
+          ?<div style={{background:'var(--bg-card)',border:'1px solid var(--line)',borderRadius:'var(--radius)',padding:20,textAlign:'center',color:'var(--ink-4)',fontSize:12}}>Нет подключённых ботов</div>
+          :allBusinesses.map(b=>{
             const online=onlineIds.has(b.id);
             return(
               <div key={b.id} className="biz-card" style={{background:'var(--bg-card)',border:'1px solid var(--line)',borderRadius:'var(--radius)',padding:'12px 14px',boxShadow:'var(--shadow)'}}>
@@ -993,7 +1004,7 @@ function AnalyticsTab({auth}){
   }
 
   const card=(title,children,fullWidth=false)=>(
-    <div style={{background:'var(--bg-card)',border:'1px solid var(--line)',borderRadius:'var(--radius)',boxShadow:'var(--shadow)',overflow:'hidden',gridColumn:fullWidth?'1/-1':'auto'}}>
+    <div className="analytics-card" style={{background:'var(--bg-card)',border:'1px solid var(--line)',borderRadius:'var(--radius)',boxShadow:'var(--shadow)',overflow:'hidden',gridColumn:fullWidth?'1/-1':'auto'}}>
       <div style={{padding:'14px 18px',borderBottom:'1px solid var(--line)',fontWeight:650,fontSize:13.5,letterSpacing:'-.01em'}}>{title}</div>
       <div style={{padding:18}}>{loading?<div className="spinner-wrap"><div className="spinner"/></div>:children}</div>
     </div>
@@ -1392,7 +1403,7 @@ function AdminPlatform({auth,onLogout}){
       {showPlatform&&<PlatformModal auth={auth} onClose={()=>setShowPlatform(false)}/>}
 
       <div className="page">
-        {tab==='overview'  &&<OverviewTab  auth={auth} period={period} bizFilter={bizFilter==='all'?'':bizFilter}/>}
+        {tab==='overview'  &&<OverviewTab  auth={auth} period={period} bizFilter={bizFilter==='all'?'':bizFilter} allBusinesses={businesses}/>}
         {tab==='leads'     &&<LeadsTab     auth={auth}/>}
         {tab==='bookings'  &&<BookingsTab  auth={auth}/>}
         {tab==='analytics' &&<AnalyticsTab auth={auth}/>}
