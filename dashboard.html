@@ -1336,9 +1336,12 @@ function AdminPlatform({auth,onLogout}){
   const [lastRefresh,setLastRefresh]=React.useState(null);
   const [showPlatform,setShowPlatform]=React.useState(false);
 
-  React.useEffect(()=>{
+  function reloadBusinesses(){
     fetch(API_BASE+'/api/businesses',{headers:{'X-API-Secret':auth.secret||''}})
-      .then(r=>r.json()).then(d=>setBusinesses(d.businesses||[])).catch(()=>{});
+      .then(r=>r.json()).then(d=>setBusinesses(Array.isArray(d.businesses)?d.businesses:Array.isArray(d)?d:[])).catch(()=>{});
+  }
+  React.useEffect(()=>{
+    reloadBusinesses();
     setLastRefresh(new Date());
   },[]);
 
@@ -1400,7 +1403,7 @@ function AdminPlatform({auth,onLogout}){
         </div>
       </nav>
 
-      {showPlatform&&<PlatformModal auth={auth} onClose={()=>setShowPlatform(false)}/>}
+      {showPlatform&&<PlatformModal auth={auth} onClose={()=>{setShowPlatform(false);reloadBusinesses();}}/>}
 
       <div className="page">
         {tab==='overview'  &&<OverviewTab  auth={auth} period={period} bizFilter={bizFilter==='all'?'':bizFilter} allBusinesses={businesses}/>}
