@@ -587,9 +587,11 @@ function LeadHistoryModal({lead,auth,onClose,onStatusChange}){
   const [messages,setMessages]=React.useState([]);
   const [loading,setLoading]=React.useState(true);
   const [status,setStatus]=React.useState(lead.status||'COLD');
-  const [booking,setBooking]=React.useState(null); // {id, scheduled_at, status}
+  const [booking,setBooking]=React.useState(null);
   const [bookingStatus,setBookingStatus]=React.useState('pending');
   const [bookingActing,setBookingActing]=React.useState(false);
+  const [note,setNote]=React.useState(()=>localStorage.getItem(`calvix_note_${lead.id}`)||'');
+  const [noteSaved,setNoteSaved]=React.useState(false);
   const bodyRef=React.useRef(null);
 
   React.useEffect(()=>{
@@ -600,17 +602,24 @@ function LeadHistoryModal({lead,auth,onClose,onStatusChange}){
         const fallback=lead.last_message?[{role:'user',content:lead.last_message,created_at:lead.created_at}]:[];
         setMessages(fallback);setLoading(false);
       });
-    // Fetch booking from Supabase by phone+business_name
-    const p={select:'*',order:'created_at.desc',limit:1};
-    if(lead.phone) p['phone']=`eq.${lead.phone}`;
-    else if(lead.full_name) p['full_name']=`eq.${lead.full_name}`;
-    if(lead.business_name) p['business_name']=`eq.${lead.business_name}`;
-    sbGet('bookings',p).then(({data})=>{
-      if(data&&data.length){
-        setBooking(data[0]);
-        setBookingStatus(data[0].status||'pending');
-      }
-    }).catch(()=>{});
+    // Use enriched booking from leads table if available, else fetch from Supabase
+    const existingBk=lead._bk||null;
+    if(existingBk){
+      setBooking(existingBk);
+      setBookingStatus(localStorage.getItem(`calvix_bk_${existingBk.id}`)||existingBk.status||'pending');
+    } else {
+      const p={select:'*',order:'created_at.desc',limit:1};
+      if(lead.phone) p['phone']=`eq.${lead.phone}`;
+      else if(lead.full_name) p['full_name']=`eq.${lead.full_name}`;
+      if(lead.business_name) p['business_name']=`eq.${lead.business_name}`;
+      sbGet('bookings',p).then(({data})=>{
+        if(data&&data.length){
+          const bk=data[0];
+          setBooking(bk);
+          setBookingStatus(localStorage.getItem(`calvix_bk_${bk.id}`)||bk.status||'pending');
+        }
+      }).catch(()=>{});
+    }
   },[lead.id]);
 
   React.useEffect(()=>{if(!loading&&bodyRef.current)bodyRef.current.scrollTop=bodyRef.current.scrollHeight;},[loading,messages]);
@@ -624,12 +633,17 @@ function LeadHistoryModal({lead,auth,onClose,onStatusChange}){
   async function changeBookingStatus(s){
     if(!booking) return;
     setBookingActing(true);
-    try{
-      await sbPatch('bookings',booking.id,{status:s});
-      setBookingStatus(s);
-      setBooking(b=>({...b,status:s}));
-    }catch(e){}
+    localStorage.setItem(`calvix_bk_${booking.id}`,s);
+    sbPatch('bookings',booking.id,{status:s}).catch(()=>{});
+    setBookingStatus(s);
+    setBooking(b=>({...b,status:s}));
     setBookingActing(false);
+  }
+
+  function saveNote(){
+    localStorage.setItem(`calvix_note_${lead.id}`,note);
+    setNoteSaved(true);
+    setTimeout(()=>setNoteSaved(false),2000);
   }
 
   const name=lead.full_name||lead.username||`Лид #${lead.id}`;
@@ -678,6 +692,17 @@ function LeadHistoryModal({lead,auth,onClose,onStatusChange}){
             </>}
             {bookingStatus!=='pending'&&<button className="btn btn-ghost btn-sm" style={{fontSize:11}} disabled={bookingActing} onClick={()=>changeBookingStatus('pending')}>↩ Вернуть</button>}
           </div>}
+        </div>
+        <div style={{padding:'10px 20px',borderTop:'1px solid var(--line)',display:'flex',gap:8,alignItems:'flex-end'}}>
+          <textarea
+            value={note}
+            onChange={e=>setNote(e.target.value)}
+            placeholder="Заметка по лиду…"
+            style={{flex:1,resize:'none',height:56,padding:'8px 10px',borderRadius:'var(--radius-sm)',border:'1px solid var(--line)',background:'var(--bg-page)',color:'var(--ink)',font:'inherit',fontSize:12,outline:'none',lineHeight:1.5}}
+          />
+          <button className="btn btn-ghost btn-sm" style={{whiteSpace:'nowrap',color:noteSaved?'var(--c1)':undefined}} onClick={saveNote}>
+            {noteSaved?'✓ Сохранено':'💾 Сохранить'}
+          </button>
         </div>
         <div className="modal-body" ref={bodyRef}>
           {loading?<div className="spinner-wrap"><div className="spinner"/><span>Загрузка диалога…</span></div>
@@ -886,7 +911,17 @@ function LeadsTab({auth, bizLock}){
     if(filters.date_from) dtArr.push(`gte.${filters.date_from}`);
     if(filters.date_to) dtArr.push(`lte.${filters.date_to}T23:59:59`);
     if(dtArr.length) p['created_at']=dtArr.length===1?dtArr[0]:dtArr;
-    const {data,count}=await sbGetPaged('hot_leads',p);setLeads(data);setTotal(count);
+    const [{data,count},bkRes]=await Promise.all([
+      sbGetPaged('hot_leads',p),
+      sbGet('bookings',{select:'id,phone,business_name,scheduled_datetime,status',order:'created_at.desc',limit:500,...(filters.business_name?{business_name:`eq.${filters.business_name}`}:bizLock?{business_name:`eq.${bizLock}`}:{})})
+    ]);
+    // build phone→latest booking map, prefer localStorage status
+    const bkMap={};
+    for(const b of(bkRes.data||[])){
+      if(b.phone&&!bkMap[b.phone]) bkMap[b.phone]={...b,status:localStorage.getItem(`calvix_bk_${b.id}`)||b.status||'pending'};
+    }
+    const enriched=(data||[]).map(l=>({...l,_bk:l.phone?bkMap[l.phone]||null:null}));
+    setLeads(enriched);setTotal(count);
     setLoading(false);
   }
 
@@ -991,8 +1026,15 @@ function LeadsTab({auth, bizLock}){
                     </div>
                   </td>
                   <td>{l.trigger_word?<span className="chip-trigger">🎯 {l.trigger_word}</span>:<span style={{color:'var(--ink-4)'}}>—</span>}</td>
-                  <td className="td-date" style={{whiteSpace:'nowrap',color:l.scheduled_at?'var(--c1)':'var(--ink-4)',fontWeight:l.scheduled_at?600:400}}>
-                    {l.scheduled_at?fmtDT(l.scheduled_at):'—'}
+                  <td style={{whiteSpace:'nowrap',verticalAlign:'middle'}}>
+                    {l._bk?(()=>{
+                      const si={pending:{l:'Ожидает',c:'badge-pending'},done:{l:'Проведён',c:'badge-done'},cancelled:{l:'Отменён',c:'badge-cancelled'}};
+                      const st=si[l._bk.status]||si.pending;
+                      return <div>
+                        <div style={{color:'var(--c1)',fontWeight:600,fontSize:12}}>{l._bk.scheduled_datetime||'—'}</div>
+                        <span className={`badge ${st.c}`} style={{fontSize:10,marginTop:3,display:'inline-block'}}>{st.l}</span>
+                      </div>;
+                    })():<span style={{color:'var(--ink-4)'}}>—</span>}
                   </td>
                   <td className="td-date">{fmtDate(l.created_at)}</td>
                 </tr>
