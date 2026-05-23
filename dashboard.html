@@ -392,7 +392,8 @@ function clearAuth(){localStorage.removeItem(AUTH_KEY);}
 function themeKey(auth){if(!auth)return'default';return auth.role==='admin'?'admin':'u'+(auth.user_id||auth.id||'x');}
 function getTheme(key){return localStorage.getItem('calvix_theme_'+(key||'default'))||'dark';}
 function applyTheme(t,key){document.body.classList.toggle('dark',t==='dark');localStorage.setItem('calvix_theme_'+(key||'default'),t);}
-applyTheme(getTheme());
+// Apply correct user theme immediately on load (no flash)
+(function(){try{const a=JSON.parse(localStorage.getItem('calvix_auth_v2')||'null');applyTheme(getTheme(themeKey(a)));}catch(e){applyTheme('dark');}})();
 
 function fmtDate(s){
   if(!s)return'—';

@@ -611,8 +611,9 @@ async def get_lead_history(request):
     return cors(web.json_response(data))
 
 
-@require_auth
 async def update_lead_status(request):
+    if not check_auth_flexible(request):
+        return cors(web.json_response({"error": "Не авторизован"}, status=401))
     lead_id = int(request.match_info["id"])
     body = await request.json()
     status = body.get("status")
@@ -666,8 +667,9 @@ async def list_bookings(request):
     return cors(web.json_response(data))
 
 
-@require_auth
 async def update_booking_status(request):
+    if not check_auth_flexible(request):
+        return cors(web.json_response({"error": "Не авторизован"}, status=401))
     booking_id = int(request.match_info["id"])
     body = await request.json()
     status = body.get("status")
