@@ -389,9 +389,9 @@ function loadAuth(){try{const v=JSON.parse(localStorage.getItem(AUTH_KEY));retur
 function saveAuth(a){localStorage.setItem(AUTH_KEY,JSON.stringify(a));}
 function clearAuth(){localStorage.removeItem(AUTH_KEY);}
 
-const THEME_KEY='calvix_theme';
-function getTheme(){return localStorage.getItem(THEME_KEY)||'light';}
-function applyTheme(t){document.body.classList.toggle('dark',t==='dark');localStorage.setItem(THEME_KEY,t);}
+function themeKey(auth){if(!auth)return'default';return auth.role==='admin'?'admin':'u'+(auth.user_id||auth.id||'x');}
+function getTheme(key){return localStorage.getItem('calvix_theme_'+(key||'default'))||'dark';}
+function applyTheme(t,key){document.body.classList.toggle('dark',t==='dark');localStorage.setItem('calvix_theme_'+(key||'default'),t);}
 applyTheme(getTheme());
 
 function fmtDate(s){
@@ -643,28 +643,28 @@ function LeadHistoryModal({lead,auth,onClose,onStatusChange}){
             ))}
           </div>
         </div>
-        {lead.scheduled_at&&(
-          <div className="modal-status" style={{borderTop:'1px solid var(--line)',paddingTop:12,marginTop:0,gap:16,flexWrap:'wrap'}}>
-            <div style={{display:'flex',alignItems:'center',gap:8}}>
-              <span style={{fontSize:13,color:'var(--ink-3)',fontWeight:500}}>📅 Звонок/встреча:</span>
-              <span style={{fontWeight:700,color:'var(--c1)',fontSize:13}}>{fmtDT(lead.scheduled_at)}</span>
-            </div>
-            <div style={{display:'flex',alignItems:'center',gap:8}}>
-              <span className="modal-status-label">Статус:</span>
-              {(()=>{
-                const si={pending:{l:'Ожидает',c:'badge-pending'},done:{l:'Проведён',c:'badge-done'},cancelled:{l:'Отменён',c:'badge-cancelled'}};
-                return <span className={`badge ${(si[bookingStatus]||si.pending).c}`}>{(si[bookingStatus]||si.pending).l}</span>;
-              })()}
-            </div>
-            <div style={{display:'flex',gap:6}}>
-              {bookingStatus==='pending'&&<>
-                <button className="btn btn-primary btn-sm" style={{fontSize:11}} disabled={bookingActing} onClick={()=>changeBookingStatus('done')}>✅ Проведён</button>
-                <button className="btn btn-ghost btn-sm" style={{color:'var(--danger)',borderColor:'var(--danger-line)',fontSize:11}} disabled={bookingActing} onClick={()=>changeBookingStatus('cancelled')}>❌ Отменить</button>
-              </>}
-              {bookingStatus!=='pending'&&<button className="btn btn-ghost btn-sm" style={{fontSize:11}} disabled={bookingActing} onClick={()=>changeBookingStatus('pending')}>↩ Вернуть</button>}
-            </div>
+        <div className="modal-status" style={{borderTop:'1px solid var(--line)',paddingTop:12,marginTop:0,gap:16,flexWrap:'wrap'}}>
+          <div style={{display:'flex',alignItems:'center',gap:8}}>
+            <span style={{fontSize:13,color:'var(--ink-3)',fontWeight:500}}>📅 Звонок/встреча:</span>
+            <span style={{fontWeight:700,color:lead.scheduled_at?'var(--c1)':'var(--ink-4)',fontSize:13}}>
+              {lead.scheduled_at?fmtDT(lead.scheduled_at):'не запланировано'}
+            </span>
           </div>
-        )}
+          <div style={{display:'flex',alignItems:'center',gap:8}}>
+            <span className="modal-status-label">Встреча:</span>
+            {(()=>{
+              const si={pending:{l:'Ожидает',c:'badge-pending'},done:{l:'Проведён',c:'badge-done'},cancelled:{l:'Отменён',c:'badge-cancelled'}};
+              return <span className={`badge ${(si[bookingStatus]||si.pending).c}`}>{(si[bookingStatus]||si.pending).l}</span>;
+            })()}
+          </div>
+          <div style={{display:'flex',gap:6}}>
+            {bookingStatus==='pending'&&<>
+              <button className="btn btn-primary btn-sm" style={{fontSize:11}} disabled={bookingActing||!lead.booking_id} onClick={()=>changeBookingStatus('done')}>✅ Проведён</button>
+              <button className="btn btn-ghost btn-sm" style={{color:'var(--danger)',borderColor:'var(--danger-line)',fontSize:11}} disabled={bookingActing||!lead.booking_id} onClick={()=>changeBookingStatus('cancelled')}>❌ Отменить</button>
+            </>}
+            {bookingStatus!=='pending'&&<button className="btn btn-ghost btn-sm" style={{fontSize:11}} disabled={bookingActing} onClick={()=>changeBookingStatus('pending')}>↩ Вернуть</button>}
+          </div>
+        </div>
         <div className="modal-body" ref={bodyRef}>
           {loading?<div className="spinner-wrap"><div className="spinner"/><span>Загрузка диалога…</span></div>
           :messages.length===0?<div className="chat-empty">История диалога пуста</div>
@@ -1645,7 +1645,7 @@ function SettingsTab({auth}){
 // ── Profile Dropdown ─────────────────────────────────────────────────────────
 function ProfileDropdown({auth,onLogout,onEditProfile,onChangePassword}){
   const [open,setOpen]=React.useState(false);
-  const [theme,setTheme]=React.useState(getTheme);
+  const [theme,setTheme]=React.useState(()=>getTheme(themeKey(auth)));
   const ref=React.useRef(null);
   React.useEffect(()=>{
     function h(e){if(ref.current&&!ref.current.contains(e.target))setOpen(false);}
@@ -1654,7 +1654,7 @@ function ProfileDropdown({auth,onLogout,onEditProfile,onChangePassword}){
   },[]);
   const initials=(auth.full_name||auth.phone||auth.email||'?').slice(0,2).toUpperCase();
   const displayName=auth.full_name||(auth.role==='admin'?'Администратор':auth.phone||auth.email||'Профиль');
-  function toggleTheme(){const t=theme==='light'?'dark':'light';setTheme(t);applyTheme(t);setOpen(false);}
+  function toggleTheme(){const t=theme==='light'?'dark':'light';setTheme(t);applyTheme(t,themeKey(auth));setOpen(false);}
   const isDark=theme==='dark';
   return(
     <div style={{position:'relative'}} ref={ref}>
@@ -2210,8 +2210,9 @@ function UserCabinet({auth:initialAuth,onLogout}){
 // ── App ───────────────────────────────────────────────────────────────────────
 function App(){
   const [auth,setAuth]=React.useState(loadAuth);
-  function handleLogin(a){saveAuth(a);setAuth(a);}
-  function handleLogout(){clearAuth();setAuth(null);}
+  React.useEffect(()=>{if(auth)applyTheme(getTheme(themeKey(auth)),themeKey(auth));},[]);
+  function handleLogin(a){saveAuth(a);applyTheme(getTheme(themeKey(a)),themeKey(a));setAuth(a);}
+  function handleLogout(){clearAuth();applyTheme(getTheme('default'),'default');setAuth(null);}
   if(!auth) return <AuthScreen onLogin={handleLogin}/>;
   if(auth.role==='admin') return <AdminPlatform auth={auth} onLogout={handleLogout}/>;
   return <UserCabinet auth={auth} onLogout={handleLogout}/>;
