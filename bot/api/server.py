@@ -681,29 +681,6 @@ async def update_booking_status(request):
     return cors(web.json_response({"message": f"Статус изменён на {status}"}))
 
 
-async def get_settings_webhook(request):
-    if not check_auth_flexible(request):
-        return cors(web.json_response({"error": "Не авторизован"}, status=401))
-    async with AsyncSessionLocal() as session:
-        row = await session.scalar(select(Setting).where(Setting.key == "webhook_url"))
-        return cors(web.json_response({"url": row.value if row else ""}))
-
-
-async def post_settings_webhook(request):
-    if not check_auth_flexible(request):
-        return cors(web.json_response({"error": "Не авторизован"}, status=401))
-    body = await request.json()
-    url = body.get("url", "").strip()
-    async with AsyncSessionLocal() as session:
-        row = await session.scalar(select(Setting).where(Setting.key == "webhook_url"))
-        if row:
-            row.value = url
-        else:
-            session.add(Setting(key="webhook_url", value=url))
-        await session.commit()
-    return cors(web.json_response({"ok": True}))
-
-
 # ─── Analytics ────────────────────────────────────────────────────────────────
 
 async def analytics_funnel(request):
