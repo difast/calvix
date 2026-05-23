@@ -1740,6 +1740,7 @@ function ProfileDropdown({auth,onLogout,onEditProfile,onChangePassword}){
               <span style={{marginLeft:'auto',fontSize:10,padding:'2px 7px',borderRadius:4,background:'rgba(22,163,74,.1)',color:'var(--accent)',fontWeight:600,border:'1px solid rgba(22,163,74,.15)'}}>Скоро</span>
             </button>
           </>}
+          <button className="dropdown-item" onClick={()=>{setOpen(false);window.open('https://calvix.ru/help','_blank');}}>❓ Помощь</button>
           <div className="dropdown-sep"/>
           <button className="dropdown-item" style={{color:'rgba(220,38,38,.8)'}} onClick={()=>{setOpen(false);onLogout();}}>🚪 Выйти</button>
         </div>
@@ -2073,7 +2074,7 @@ function AdminPlatform({auth,onLogout}){
     <div className="shell">
       <header className="header">
         <div className="header-inner">
-          <div className="logo-wrap">
+          <div className="logo-wrap" style={{cursor:'pointer'}} onClick={()=>window.open('https://calvix.ru/','_blank')}>
             <div className="logo-mark">C</div>
             <div>
               <div className="logo-text">Calvix <span>AI</span></div>
@@ -2183,7 +2184,7 @@ function UserCabinet({auth:initialAuth,onLogout}){
     <div className="shell">
       <header className="header">
         <div className="header-inner">
-          <div className="logo-wrap">
+          <div className="logo-wrap" style={{cursor:'pointer'}} onClick={()=>window.open('https://calvix.ru/','_blank')}>
             <div className="logo-mark">C</div>
             <div>
               <div className="logo-text">Calvix <span>AI</span></div>
