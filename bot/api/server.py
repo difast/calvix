@@ -885,6 +885,32 @@ async def post_settings_templates(request):
     return cors(web.json_response({"ok": True}))
 
 
+async def get_settings_working_hours(request):
+    async with AsyncSessionLocal() as session:
+        row = await session.scalar(select(Setting).where(Setting.key == "working_hours"))
+        if row:
+            try:
+                data = json.loads(row.value)
+            except Exception:
+                data = {}
+        else:
+            data = {}
+    return cors(web.json_response(data))
+
+
+async def post_settings_working_hours(request):
+    body = await request.json()
+    async with AsyncSessionLocal() as session:
+        row = await session.scalar(select(Setting).where(Setting.key == "working_hours"))
+        val = json.dumps(body, ensure_ascii=False)
+        if row:
+            row.value = val
+        else:
+            session.add(Setting(key="working_hours", value=val))
+        await session.commit()
+    return cors(web.json_response({"ok": True}))
+
+
 async def get_settings_webhook(request):
     if not check_auth_flexible(request):
         return cors(web.json_response({"error": "Не авторизован"}, status=401))
@@ -970,6 +996,8 @@ def create_app() -> web.Application:
     app.router.add_post("/api/settings/templates", post_settings_templates)
     app.router.add_route("OPTIONS", "/api/settings/keywords", handle_options)
     app.router.add_route("OPTIONS", "/api/settings/templates", handle_options)
+    app.router.add_get("/api/settings/working-hours", get_settings_working_hours)
+    app.router.add_post("/api/settings/working-hours", post_settings_working_hours)
     app.router.add_get("/api/settings/webhook", get_settings_webhook)
     app.router.add_post("/api/settings/webhook", post_settings_webhook)
     app.router.add_route("OPTIONS", "/api/settings/webhook", handle_options)
