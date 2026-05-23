@@ -807,19 +807,21 @@ function OverviewTab({auth,period,bizFilter,allBusinesses=[]}){
 }
 
 // ── Leads Tab ─────────────────────────────────────────────────────────────────
-function LeadsTab({auth}){
+function LeadsTab({auth, bizLock}){
   const [leads,setLeads]=React.useState([]);
   const [total,setTotal]=React.useState(0);
   const [page,setPage]=React.useState(1);
   const [loading,setLoading]=React.useState(false);
   const [bizNames,setBizNames]=React.useState([]);
-  const [filters,setFilters]=React.useState({business_name:'',status:'',date_from:'',date_to:''});
-  const [pending,setPending]=React.useState({business_name:'',status:'',date_from:'',date_to:''});
+  const initF={business_name:bizLock||'',status:'',date_from:'',date_to:''};
+  const [filters,setFilters]=React.useState(initF);
+  const [pending,setPending]=React.useState(initF);
   const [selected,setSelected]=React.useState(null);
   const PER=25;
   const totalPages=Math.max(1,Math.ceil(total/PER));
 
   React.useEffect(()=>{
+    if(bizLock) return; // no need to load all biz names when locked
     sbGet('hot_leads',{select:'business_name',order:'business_name.asc',limit:500})
       .then(({data})=>{setBizNames([...new Set(data.map(r=>r.business_name).filter(Boolean))]);})
       .catch(()=>{});
@@ -878,13 +880,13 @@ function LeadsTab({auth}){
   return(
     <div>
       <div className="filters-bar">
-        <div className="filter-group">
+        {!bizLock&&<div className="filter-group">
           <span className="filter-label">Бизнес</span>
           <select className="filter-select" value={pending.business_name} onChange={e=>setPending(p=>({...p,business_name:e.target.value}))}>
             <option value="">Все бизнесы</option>
             {bizNames.map(n=><option key={n} value={n}>{n}</option>)}
           </select>
-        </div>
+        </div>}
         <div className="filter-group">
           <span className="filter-label">Статус</span>
           <select className="filter-select" value={pending.status} onChange={e=>setPending(p=>({...p,status:e.target.value}))}>
@@ -973,7 +975,11 @@ function AnalyticsTab({auth}){
 
   React.useEffect(()=>{
     fetch(API_BASE+'/api/businesses',{headers:authHeaders(auth)})
-      .then(r=>r.json()).then(d=>setBusinesses(Array.isArray(d.businesses)?d.businesses:Array.isArray(d)?d:[])).catch(()=>{});
+      .then(r=>r.json()).then(d=>{
+        const arr=Array.isArray(d.businesses)?d.businesses:Array.isArray(d)?d:[];
+        setBusinesses(arr);
+        if(arr.length===1) setBiz(String(arr[0].id)); // auto-select single (user's own) biz
+      }).catch(()=>{});
   },[]);
 
   React.useEffect(()=>{load();},[bizFilter,days]);
@@ -1095,13 +1101,13 @@ function AnalyticsTab({auth}){
   return(
     <div>
       <div className="filters-bar" style={{marginBottom:20}}>
-        <div className="filter-group">
+        {businesses.length>1&&<div className="filter-group">
           <span className="filter-label">Бизнес</span>
           <select className="filter-select" value={bizFilter} onChange={e=>setBiz(e.target.value)}>
             <option value="">Все бизнесы</option>
             {businesses.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
-        </div>
+        </div>}
         <div className="filter-group">
           <span className="filter-label">График за</span>
           <div className="seg" style={{height:34,alignItems:'center'}}>
@@ -1122,15 +1128,16 @@ function AnalyticsTab({auth}){
 }
 
 // ── Bookings Tab ──────────────────────────────────────────────────────────────
-function BookingsTab({auth}){
+function BookingsTab({auth, bizLock}){
   const [bookings,setBookings]=React.useState([]);
   const [loading,setLoading]=React.useState(false);
   const [bizNames,setBizNames]=React.useState([]);
   const [statusMap,setStatusMap]=React.useState({});
-  const [filters,setFilters]=React.useState({business_name:''});
-  const [pending,setPending]=React.useState({business_name:''});
+  const [filters,setFilters]=React.useState({business_name:bizLock||''});
+  const [pending,setPending]=React.useState({business_name:bizLock||''});
 
   React.useEffect(()=>{
+    if(bizLock) return;
     sbGet('bookings',{select:'business_name',order:'business_name.asc',limit:500})
       .then(({data})=>{setBizNames([...new Set(data.map(r=>r.business_name).filter(Boolean))]);})
       .catch(()=>{});
@@ -1164,16 +1171,16 @@ function BookingsTab({auth}){
       </div>
 
       <div className="filters-bar">
-        <div className="filter-group">
+        {!bizLock&&<div className="filter-group">
           <span className="filter-label">Бизнес</span>
           <select className="filter-select" value={pending.business_name} onChange={e=>setPending(p=>({...p,business_name:e.target.value}))}>
             <option value="">Все бизнесы</option>
             {bizNames.map(n=><option key={n} value={n}>{n}</option>)}
           </select>
-        </div>
+        </div>}
         <div className="filters-actions">
           <button className="btn btn-primary btn-sm" onClick={()=>setFilters({...pending})}>Применить</button>
-          <button className="btn btn-ghost btn-sm" onClick={()=>{const e={business_name:''};setPending(e);setFilters(e);}}>Сбросить</button>
+          {!bizLock&&<button className="btn btn-ghost btn-sm" onClick={()=>{const e={business_name:''};setPending(e);setFilters(e);}}>Сбросить</button>}
         </div>
       </div>
 
@@ -1412,7 +1419,6 @@ function PlatformModal({auth,onClose}){
 // ── Settings Tab ─────────────────────────────────────────────────────────────
 function SettingsTab({auth}){
   const H=authHeaders(auth);
-  const isAdmin=auth?.role==='admin';
   const inp={width:'100%',padding:'9px 12px',borderRadius:'var(--radius-sm)',border:'1px solid var(--line)',background:'var(--bg-page)',color:'var(--ink)',font:'inherit',fontSize:13,outline:'none',boxSizing:'border-box',transition:'border-color .15s'};
   const lbl={fontSize:11,fontWeight:600,color:'var(--ink-3)',textTransform:'uppercase',letterSpacing:'.05em',display:'block',marginBottom:5};
   const sec=(icon,title,sub,children)=>(
@@ -1424,24 +1430,6 @@ function SettingsTab({auth}){
       <div style={{padding:'20px 22px'}}>{children}</div>
     </div>
   );
-
-  // ── Тема ──────────────────────────────────────────────────────────────────
-  const [theme,setThemeState]=React.useState(getTheme);
-  function toggleThemeSetting(t){setThemeState(t);applyTheme(t);}
-
-  // ── 1. Профиль администратора ──────────────────────────────────────────────
-  const [pwd,setPwd]=React.useState({cur:'',next:'',rep:''});
-  const [pwdMsg,setPwdMsg]=React.useState(null);
-  async function savePwd(e){
-    e.preventDefault();
-    if(pwd.next!==pwd.rep){setPwdMsg({ok:false,t:'Пароли не совпадают'});return;}
-    if(pwd.next.length<6){setPwdMsg({ok:false,t:'Минимум 6 символов'});return;}
-    try{
-      const r=await fetch(API_BASE+'/api/admin/password',{method:'PUT',headers:H,body:JSON.stringify({new_password:pwd.next})});
-      if(r.ok){setPwdMsg({ok:true,t:'Пароль обновлён'});setPwd({cur:'',next:'',rep:''});}
-      else{const d=await r.json();setPwdMsg({ok:false,t:d.error||'Ошибка'});}
-    }catch{setPwdMsg({ok:true,t:'Запрос отправлен'});}
-  }
 
   // ── 3. Ключевые слова ──────────────────────────────────────────────────────
   const defHot='купить, цена, оплатить, договор, счет, покупка, хочу заказать, нужен срочно, записаться, хочу записаться, созвон, встретиться, позвоните, демо, покажите, запишите, запись, хочу попробовать, когда можно начать, как записаться, хочу начать, готов начать, оформить';
@@ -1506,31 +1494,6 @@ function SettingsTab({auth}){
 
   return(
     <div style={{maxWidth:800}}>
-      {sec('🎨','Оформление','Выбор темы интерфейса',
-        <div style={{display:'flex',gap:12}}>
-          {[['light','☀️ Светлая','Классический светлый интерфейс'],['dark','🌙 Тёмная','Тёмный режим, мягкие цвета']].map(([v,l,d])=>(
-            <div key={v} onClick={()=>toggleThemeSetting(v)} style={{flex:1,padding:'14px 18px',borderRadius:'var(--radius)',border:`2px solid ${theme===v?'var(--accent)':'var(--line)'}`,cursor:'pointer',transition:'all .15s',background:theme===v?'var(--c1d)':'var(--bg-page)',display:'flex',alignItems:'center',gap:12}}>
-              <span style={{fontSize:24}}>{l.split(' ')[0]}</span>
-              <div>
-                <div style={{fontWeight:600,fontSize:13,color:theme===v?'var(--accent)':'var(--ink-2)'}}>{l.split(' ').slice(1).join(' ')}</div>
-                <div style={{fontSize:11,color:'var(--ink-4)',marginTop:2}}>{d}</div>
-              </div>
-              {theme===v&&<span style={{marginLeft:'auto',width:16,height:16,borderRadius:'50%',background:'var(--accent)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,color:'#fff',flexShrink:0}}>✓</span>}
-            </div>
-          ))}
-        </div>
-      )}
-      {isAdmin&&sec('👤','Профиль администратора','Смена пароля для входа в панель',
-        <form onSubmit={savePwd}>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginBottom:4}}>
-            <div><label style={lbl}>Новый пароль</label><input style={inp} type="password" value={pwd.next} onChange={e=>setPwd(p=>({...p,next:e.target.value}))} required/></div>
-            <div><label style={lbl}>Повторите пароль</label><input style={inp} type="password" value={pwd.rep} onChange={e=>setPwd(p=>({...p,rep:e.target.value}))} required/></div>
-          </div>
-          <div style={{display:'flex',justifyContent:'flex-end',marginTop:14}}><button className="btn btn-primary btn-sm" type="submit">Сохранить пароль</button></div>
-          <Msg m={pwdMsg}/>
-        </form>
-      )}
-
       {sec('🎯','Ключевые слова квалификации','Слова, по которым бот определяет статус лида. Через запятую.',
         <div style={{display:'flex',flexDirection:'column',gap:14}}>
           {[{l:'🔥 HOT — запись на созвон',k:'hot',c:'#ef4444'},{l:'⚡ WARM — проявил интерес',k:'warm',c:'#f97316'},{l:'❄️ COLD — отказ / нет интереса',k:'cold',c:'#3b82f6'}].map(({l,k,c})=>(
@@ -2143,8 +2106,8 @@ function UserCabinet({auth:initialAuth,onLogout}){
           </div>
         )}
         {tab==='overview'  &&<OverviewTab  auth={authData} period={period} bizFilter={bizName} allBusinesses={businesses}/>}
-        {tab==='leads'     &&<LeadsTab     auth={authData}/>}
-        {tab==='bookings'  &&<BookingsTab  auth={authData}/>}
+        {tab==='leads'     &&<LeadsTab     auth={authData} bizLock={authData.business_name||undefined}/>}
+        {tab==='bookings'  &&<BookingsTab  auth={authData} bizLock={authData.business_name||undefined}/>}
         {tab==='analytics' &&<AnalyticsTab auth={authData}/>}
         {tab==='telephony' &&(
           <div className="coming-card">
