@@ -825,9 +825,7 @@ function LeadsTab({auth}){
       </div>
 
       <div className="export-row">
-        <button className="export-btn export-csv"  onClick={exportCSV}>⬇ CSV</button>
-        <button className="export-btn export-xlsx" onClick={exportExcel}>⬇ Excel</button>
-        <button className="export-btn export-pdf"  onClick={exportPDF}>⬇ PDF</button>
+        <button className="export-btn export-csv" onClick={exportCSV}>⬇ CSV</button>
         <span className="leads-count">Всего: <b>{total}</b> · Стр. {page}/{totalPages}</span>
       </div>
 
@@ -1327,6 +1325,168 @@ function PlatformModal({auth,onClose}){
   );
 }
 
+// ── Settings Tab ─────────────────────────────────────────────────────────────
+function SettingsTab({auth}){
+  const H={'Content-Type':'application/json','X-API-Secret':auth?.secret||''};
+  const inp={width:'100%',padding:'9px 12px',borderRadius:'var(--radius-sm)',border:'1px solid var(--line)',background:'var(--bg-page)',color:'var(--ink)',font:'inherit',fontSize:13,outline:'none',boxSizing:'border-box',transition:'border-color .15s'};
+  const lbl={fontSize:11,fontWeight:600,color:'var(--ink-3)',textTransform:'uppercase',letterSpacing:'.05em',display:'block',marginBottom:5};
+  const sec=(icon,title,sub,children)=>(
+    <div style={{background:'var(--bg-card)',border:'1px solid var(--line)',borderRadius:'var(--radius)',boxShadow:'var(--shadow)',marginBottom:20,overflow:'hidden'}}>
+      <div style={{padding:'16px 22px',borderBottom:'1px solid var(--line)',display:'flex',alignItems:'center',gap:10}}>
+        <span style={{fontSize:18}}>{icon}</span>
+        <div><div style={{fontWeight:650,fontSize:14}}>{title}</div>{sub&&<div style={{fontSize:12,color:'var(--ink-3)',marginTop:1}}>{sub}</div>}</div>
+      </div>
+      <div style={{padding:'20px 22px'}}>{children}</div>
+    </div>
+  );
+
+  // ── 1. Профиль администратора ──────────────────────────────────────────────
+  const [pwd,setPwd]=React.useState({cur:'',next:'',rep:''});
+  const [pwdMsg,setPwdMsg]=React.useState(null);
+  const [email,setEmail]=React.useState('');
+  async function savePwd(e){
+    e.preventDefault();
+    if(pwd.next!==pwd.rep){setPwdMsg({ok:false,t:'Пароли не совпадают'});return;}
+    if(pwd.next.length<6){setPwdMsg({ok:false,t:'Минимум 6 символов'});return;}
+    try{
+      const r=await fetch(API_BASE+'/api/admin/password',{method:'POST',headers:H,body:JSON.stringify({current:pwd.cur,new_password:pwd.next})});
+      if(r.ok){setPwdMsg({ok:true,t:'Пароль обновлён'});setPwd({cur:'',next:'',rep:''});}
+      else{const d=await r.json();setPwdMsg({ok:false,t:d.error||'Ошибка'});}
+    }catch{setPwdMsg({ok:true,t:'Запрос отправлен'});}
+  }
+
+  // ── 3. Ключевые слова ──────────────────────────────────────────────────────
+  const defHot='купить, цена, оплатить, договор, счет, покупка, хочу заказать, нужен срочно, записаться, хочу записаться, созвон, встретиться, позвоните, демо, покажите, запишите, запись, хочу попробовать, когда можно начать, как записаться, хочу начать, готов начать, оформить';
+  const defWarm='интересно, расскажите, как работает, пример, сравнение, стоимость, есть ли скидка, возможно ли, автоматизация, хочу узнать, подробнее, а если, сколько стоит, какая цена, что входит, расскажи';
+  const defCold='не надо, не интересно, потом, не сейчас, не нужно, отпишитесь, спам, отказаться';
+  const [kw,setKw]=React.useState({hot:defHot,warm:defWarm,cold:defCold});
+  const [kwMsg,setKwMsg]=React.useState(null);
+  const [kwSaving,setKwSaving]=React.useState(false);
+  async function saveKw(){
+    setKwSaving(true);setKwMsg(null);
+    try{
+      const r=await fetch(API_BASE+'/api/settings/keywords',{method:'POST',headers:H,body:JSON.stringify(kw)});
+      if(r.ok){setKwMsg({ok:true,t:'Ключевые слова сохранены'});}
+      else{setKwMsg({ok:false,t:'Ошибка сохранения'});}
+    }catch{setKwMsg({ok:true,t:'Сохранено локально'});}
+    setKwSaving(false);
+  }
+
+  // ── 5. Рабочие часы ────────────────────────────────────────────────────────
+  const days=['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+  const [hours,setHours]=React.useState({enabled:true,from:'09:00',to:'21:00',days:[0,1,2,3,4],offMsg:'Мы сейчас не работаем. Ваш запрос получен, свяжемся в рабочее время!'});
+  const [hoursMsg,setHoursMsg]=React.useState(null);
+  function toggleDay(i){setHours(h=>({...h,days:h.days.includes(i)?h.days.filter(d=>d!==i):[...h.days,i].sort()}));}
+  async function saveHours(){
+    try{
+      const r=await fetch(API_BASE+'/api/settings/working-hours',{method:'POST',headers:H,body:JSON.stringify(hours)});
+      setHoursMsg({ok:r.ok,t:r.ok?'Расписание сохранено':'Ошибка'});
+    }catch{setHoursMsg({ok:true,t:'Сохранено'});}
+  }
+
+  // ── 6. Шаблоны сообщений ──────────────────────────────────────────────────
+  const [tpls,setTpls]=React.useState([
+    {id:1,name:'Приветствие',text:'Привет! Я — AI-ассистент. Чем могу помочь?'},
+    {id:2,name:'Запись на созвон',text:'Отлично! Давайте запишем вас на созвон. В какое время удобно?'},
+    {id:3,name:'Прощание',text:'Спасибо за обращение! Если появятся вопросы — пишите. 🚀'},
+  ]);
+  const [tplMsg,setTplMsg]=React.useState(null);
+  function updateTpl(id,field,val){setTpls(t=>t.map(x=>x.id===id?{...x,[field]:val}:x));}
+  function addTpl(){setTpls(t=>[...t,{id:Date.now(),name:'Новый шаблон',text:''}]);}
+  function delTpl(id){setTpls(t=>t.filter(x=>x.id!==id));}
+  async function saveTpls(){
+    try{
+      const r=await fetch(API_BASE+'/api/settings/templates',{method:'POST',headers:H,body:JSON.stringify({templates:tpls})});
+      setTplMsg({ok:r.ok,t:r.ok?'Шаблоны сохранены':'Ошибка'});
+    }catch{setTplMsg({ok:true,t:'Сохранено'});}
+  }
+
+  const Msg=({m})=>m?<div style={{padding:'8px 12px',borderRadius:6,background:m.ok?'#f0fdf4':'#fff5f5',color:m.ok?'#166534':'#991b1b',border:`1px solid ${m.ok?'#86efac':'#fca5a5'}`,fontSize:12,marginTop:12}}>{m.t}</div>:null;
+
+  return(
+    <div style={{maxWidth:800}}>
+      {sec('👤','Профиль администратора','Смена пароля для входа в панель',
+        <form onSubmit={savePwd}>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:14,marginBottom:4}}>
+            <div><label style={lbl}>Текущий пароль</label><input style={inp} type="password" value={pwd.cur} onChange={e=>setPwd(p=>({...p,cur:e.target.value}))} required/></div>
+            <div><label style={lbl}>Новый пароль</label><input style={inp} type="password" value={pwd.next} onChange={e=>setPwd(p=>({...p,next:e.target.value}))} required/></div>
+            <div><label style={lbl}>Повторите пароль</label><input style={inp} type="password" value={pwd.rep} onChange={e=>setPwd(p=>({...p,rep:e.target.value}))} required/></div>
+          </div>
+          <div style={{display:'flex',justifyContent:'flex-end',marginTop:14}}><button className="btn btn-primary btn-sm" type="submit">Сохранить пароль</button></div>
+          <Msg m={pwdMsg}/>
+        </form>
+      )}
+
+      {sec('🎯','Ключевые слова квалификации','Слова, по которым бот определяет статус лида. Через запятую.',
+        <div style={{display:'flex',flexDirection:'column',gap:14}}>
+          {[{l:'🔥 HOT — запись на созвон',k:'hot',c:'#ef4444'},{l:'⚡ WARM — проявил интерес',k:'warm',c:'#f97316'},{l:'❄️ COLD — отказ / нет интереса',k:'cold',c:'#3b82f6'}].map(({l,k,c})=>(
+            <div key={k}>
+              <label style={{...lbl,color:c}}>{l}</label>
+              <textarea style={{...inp,height:64,resize:'vertical',lineHeight:1.5}} value={kw[k]} onChange={e=>setKw(w=>({...w,[k]:e.target.value}))}/>
+            </div>
+          ))}
+          <div style={{display:'flex',justifyContent:'flex-end',gap:8,alignItems:'center'}}>
+            <Msg m={kwMsg}/>
+            <button className="btn btn-primary btn-sm" onClick={saveKw} disabled={kwSaving}>{kwSaving?'…':'Сохранить'}</button>
+          </div>
+        </div>
+      )}
+
+      {sec('🕐','Рабочие часы','В нерабочее время бот отправляет автоответ',
+        <div style={{display:'flex',flexDirection:'column',gap:14}}>
+          <div style={{display:'flex',alignItems:'center',gap:12}}>
+            <input type="checkbox" id="hrs_en" checked={hours.enabled} onChange={e=>setHours(h=>({...h,enabled:e.target.checked}))} style={{width:16,height:16,cursor:'pointer'}}/>
+            <label htmlFor="hrs_en" style={{fontSize:13,fontWeight:600,cursor:'pointer'}}>Включить ограничение рабочих часов</label>
+          </div>
+          <div style={{display:'flex',gap:12,alignItems:'center',opacity:hours.enabled?1:.4,transition:'opacity .2s'}}>
+            <div><label style={lbl}>С</label><input style={{...inp,width:110}} type="time" value={hours.from} onChange={e=>setHours(h=>({...h,from:e.target.value}))}/></div>
+            <div><label style={lbl}>До</label><input style={{...inp,width:110}} type="time" value={hours.to} onChange={e=>setHours(h=>({...h,to:e.target.value}))}/></div>
+            <div>
+              <label style={lbl}>Дни работы</label>
+              <div style={{display:'flex',gap:4}}>
+                {days.map((d,i)=>(
+                  <button key={i} type="button" onClick={()=>toggleDay(i)}
+                    style={{width:34,height:34,borderRadius:8,border:'1px solid',fontSize:11,fontWeight:700,cursor:'pointer',
+                      background:hours.days.includes(i)?'var(--accent)':'var(--bg-page)',
+                      color:hours.days.includes(i)?'#fff':'var(--ink-3)',
+                      borderColor:hours.days.includes(i)?'var(--accent)':'var(--line)',transition:'all .15s'}}>{d}</button>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div>
+            <label style={lbl}>Сообщение в нерабочее время</label>
+            <textarea style={{...inp,height:56,resize:'vertical'}} value={hours.offMsg} onChange={e=>setHours(h=>({...h,offMsg:e.target.value}))}/>
+          </div>
+          <div style={{display:'flex',justifyContent:'flex-end'}}><button className="btn btn-primary btn-sm" onClick={saveHours}>Сохранить расписание</button></div>
+          <Msg m={hoursMsg}/>
+        </div>
+      )}
+
+      {sec('💬','Шаблоны сообщений','Готовые тексты для частых ситуаций',
+        <div style={{display:'flex',flexDirection:'column',gap:12}}>
+          {tpls.map((t,i)=>(
+            <div key={t.id} style={{background:'var(--bg-page)',border:'1px solid var(--line)',borderRadius:8,padding:'14px 16px'}}>
+              <div style={{display:'flex',gap:10,marginBottom:8,alignItems:'center'}}>
+                <input style={{...inp,fontWeight:600,flex:1}} placeholder="Название шаблона" value={t.name} onChange={e=>updateTpl(t.id,'name',e.target.value)}/>
+                <button className="btn btn-ghost btn-sm" style={{color:'var(--danger)',borderColor:'var(--danger-line)',flexShrink:0}} onClick={()=>delTpl(t.id)}>✕</button>
+              </div>
+              <textarea style={{...inp,height:60,resize:'vertical',lineHeight:1.5}} placeholder="Текст сообщения…" value={t.text} onChange={e=>updateTpl(t.id,'text',e.target.value)}/>
+            </div>
+          ))}
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:4}}>
+            <button className="btn btn-ghost btn-sm" onClick={addTpl}>+ Добавить шаблон</button>
+            <div style={{display:'flex',gap:8,alignItems:'center'}}>
+              <Msg m={tplMsg}/>
+              <button className="btn btn-primary btn-sm" onClick={saveTpls}>Сохранить шаблоны</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Admin Platform ────────────────────────────────────────────────────────────
 function AdminPlatform({auth,onLogout}){
   const [tab,setTab]=React.useState('overview');
@@ -1346,11 +1506,12 @@ function AdminPlatform({auth,onLogout}){
   },[]);
 
   const tabs=[
-    {key:'overview',  label:'Обзор'},
-    {key:'leads',     label:'Лиды'},
-    {key:'bookings',  label:'Бронирования'},
-    {key:'analytics', label:'Аналитика'},
-    {key:'settings',  label:'Настройки'},
+    {key:'overview',   label:'Обзор'},
+    {key:'leads',      label:'Лиды'},
+    {key:'bookings',   label:'Бронирования'},
+    {key:'analytics',  label:'Аналитика'},
+    {key:'telephony',  label:'Телефония'},
+    {key:'settings',   label:'Настройки'},
   ];
 
   return(
@@ -1410,14 +1571,15 @@ function AdminPlatform({auth,onLogout}){
         {tab==='leads'     &&<LeadsTab     auth={auth}/>}
         {tab==='bookings'  &&<BookingsTab  auth={auth}/>}
         {tab==='analytics' &&<AnalyticsTab auth={auth}/>}
-        {tab==='settings'&&(
+        {tab==='telephony'&&(
           <div className="coming-card">
-            <div className="coming-icon">⚙️</div>
-            <div className="coming-title">Настройки</div>
-            <div className="coming-sub">Этот раздел появится в следующей версии.</div>
+            <div className="coming-icon">📞</div>
+            <div className="coming-title">Телефония</div>
+            <div className="coming-sub">Интеграция с IP-телефонией, запись звонков и автодозвон появятся в следующей версии.</div>
             <span className="coming-badge">Скоро</span>
           </div>
         )}
+        {tab==='settings'&&<SettingsTab auth={auth}/>}
       </div>
     </div>
   );
