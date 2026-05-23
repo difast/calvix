@@ -586,6 +586,8 @@ function LeadHistoryModal({lead,auth,onClose,onStatusChange}){
   const [messages,setMessages]=React.useState([]);
   const [loading,setLoading]=React.useState(true);
   const [status,setStatus]=React.useState(lead.status||'COLD');
+  const [bookingStatus,setBookingStatus]=React.useState(lead.booking_status||'pending');
+  const [bookingActing,setBookingActing]=React.useState(false);
   const bodyRef=React.useRef(null);
 
   React.useEffect(()=>{
@@ -604,6 +606,16 @@ function LeadHistoryModal({lead,auth,onClose,onStatusChange}){
     setStatus(s);
     sbPatch('hot_leads',lead.id,{status:s}).catch(()=>{});
     onStatusChange(lead.id,s);
+  }
+
+  async function changeBookingStatus(s){
+    if(!lead.booking_id) return;
+    setBookingActing(true);
+    try{
+      await fetch(API_BASE+`/api/bookings/${lead.booking_id}/status`,{method:'PUT',headers:authHeaders(auth),body:JSON.stringify({status:s})});
+      setBookingStatus(s);
+    }catch(e){}
+    setBookingActing(false);
   }
 
   const name=lead.full_name||lead.username||`Лид #${lead.id}`;
@@ -631,6 +643,28 @@ function LeadHistoryModal({lead,auth,onClose,onStatusChange}){
             ))}
           </div>
         </div>
+        {lead.scheduled_at&&(
+          <div className="modal-status" style={{borderTop:'1px solid var(--line)',paddingTop:12,marginTop:0,gap:16,flexWrap:'wrap'}}>
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <span style={{fontSize:13,color:'var(--ink-3)',fontWeight:500}}>📅 Звонок/встреча:</span>
+              <span style={{fontWeight:700,color:'var(--c1)',fontSize:13}}>{fmtDT(lead.scheduled_at)}</span>
+            </div>
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <span className="modal-status-label">Статус:</span>
+              {(()=>{
+                const si={pending:{l:'Ожидает',c:'badge-pending'},done:{l:'Проведён',c:'badge-done'},cancelled:{l:'Отменён',c:'badge-cancelled'}};
+                return <span className={`badge ${(si[bookingStatus]||si.pending).c}`}>{(si[bookingStatus]||si.pending).l}</span>;
+              })()}
+            </div>
+            <div style={{display:'flex',gap:6}}>
+              {bookingStatus==='pending'&&<>
+                <button className="btn btn-primary btn-sm" style={{fontSize:11}} disabled={bookingActing} onClick={()=>changeBookingStatus('done')}>✅ Проведён</button>
+                <button className="btn btn-ghost btn-sm" style={{color:'var(--danger)',borderColor:'var(--danger-line)',fontSize:11}} disabled={bookingActing} onClick={()=>changeBookingStatus('cancelled')}>❌ Отменить</button>
+              </>}
+              {bookingStatus!=='pending'&&<button className="btn btn-ghost btn-sm" style={{fontSize:11}} disabled={bookingActing} onClick={()=>changeBookingStatus('pending')}>↩ Вернуть</button>}
+            </div>
+          </div>
+        )}
         <div className="modal-body" ref={bodyRef}>
           {loading?<div className="spinner-wrap"><div className="spinner"/><span>Загрузка диалога…</span></div>
           :messages.length===0?<div className="chat-empty">История диалога пуста</div>
@@ -1455,6 +1489,10 @@ function SettingsTab({auth}){
   const [kwSaving,setKwSaving]=React.useState(false);
   const [kwLoading,setKwLoading]=React.useState(true);
 
+  const [webhookUrl,setWebhookUrl]=React.useState('');
+  const [webhookMsg,setWebhookMsg]=React.useState(null);
+  const [webhookSaving,setWebhookSaving]=React.useState(false);
+
   React.useEffect(()=>{
     fetch(API_BASE+'/api/settings/keywords').then(r=>r.json()).then(d=>{
       if(d.hot||d.warm||d.cold) setKw({hot:d.hot||defHot,warm:d.warm||defWarm,cold:d.cold||defCold});
@@ -1462,6 +1500,9 @@ function SettingsTab({auth}){
     }).catch(()=>setKwLoading(false));
     fetch(API_BASE+'/api/settings/templates').then(r=>r.json()).then(d=>{
       if(d.templates&&d.templates.length) setTpls(d.templates);
+    }).catch(()=>{});
+    fetch(API_BASE+'/api/settings/webhook',{headers:H}).then(r=>r.json()).then(d=>{
+      if(d.url) setWebhookUrl(d.url);
     }).catch(()=>{});
   },[]);
 
@@ -1503,6 +1544,15 @@ function SettingsTab({auth}){
       const r=await fetch(API_BASE+'/api/settings/templates',{method:'POST',headers:H,body:JSON.stringify({templates:tpls})});
       setTplMsg({ok:r.ok,t:r.ok?'Шаблоны сохранены':'Ошибка'});
     }catch{setTplMsg({ok:true,t:'Сохранено'});}
+  }
+
+  async function saveWebhook(){
+    setWebhookSaving(true);setWebhookMsg(null);
+    try{
+      const r=await fetch(API_BASE+'/api/settings/webhook',{method:'POST',headers:H,body:JSON.stringify({url:webhookUrl})});
+      setWebhookMsg({ok:r.ok,t:r.ok?'Webhook сохранён':'Ошибка сохранения'});
+    }catch{setWebhookMsg({ok:true,t:'Сохранено локально'});}
+    setWebhookSaving(false);
   }
 
   const Msg=({m})=>m?<div style={{padding:'8px 12px',borderRadius:6,background:m.ok?'#f0fdf4':'#fff5f5',color:m.ok?'#166534':'#991b1b',border:`1px solid ${m.ok?'#86efac':'#fca5a5'}`,fontSize:12,marginTop:12}}>{m.t}</div>:null;
@@ -1572,6 +1622,19 @@ function SettingsTab({auth}){
               <Msg m={tplMsg}/>
               <button className="btn btn-primary btn-sm" onClick={saveTpls}>Сохранить шаблоны</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {sec('🔗','Webhook','Вызывается при смене статуса лида на HOT или изменении статуса встречи. Получает JSON с данными.',
+        <div style={{display:'flex',flexDirection:'column',gap:14}}>
+          <div>
+            <label style={lbl}>URL для уведомлений</label>
+            <input style={inp} type="url" placeholder="https://example.com/webhook" value={webhookUrl} onChange={e=>setWebhookUrl(e.target.value)}/>
+          </div>
+          <div style={{display:'flex',justifyContent:'flex-end',gap:8,alignItems:'center'}}>
+            <Msg m={webhookMsg}/>
+            <button className="btn btn-primary btn-sm" onClick={saveWebhook} disabled={webhookSaving}>{webhookSaving?'…':'Сохранить'}</button>
           </div>
         </div>
       )}
@@ -1944,7 +2007,6 @@ function AdminPlatform({auth,onLogout}){
   const tabs=[
     {key:'overview',    label:'Обзор'},
     {key:'leads',       label:'Лиды'},
-    {key:'bookings',    label:'Бронирования'},
     {key:'analytics',   label:'Аналитика'},
     {key:'telephony',   label:'Телефония'},
     {key:'management',  label:'Управление'},
@@ -2007,7 +2069,6 @@ function AdminPlatform({auth,onLogout}){
       <div className="page">
         {tab==='overview'   &&<OverviewTab         auth={auth} period={period} bizFilter={bizFilter==='all'?'':bizFilter} allBusinesses={businesses}/>}
         {tab==='leads'      &&<LeadsTab            auth={auth}/>}
-        {tab==='bookings'   &&<BookingsTab         auth={auth}/>}
         {tab==='analytics'  &&<AnalyticsTab        auth={auth}/>}
         {tab==='management' &&<UsersManagementTab  auth={auth}/>}
         {tab==='telephony'&&(
@@ -2055,7 +2116,6 @@ function UserCabinet({auth:initialAuth,onLogout}){
   const tabs=[
     {key:'overview',   label:'Обзор'},
     {key:'leads',      label:'Лиды'},
-    {key:'bookings',   label:'Бронирования'},
     {key:'analytics',  label:'Аналитика'},
     {key:'telephony',  label:'Телефония'},
     {key:'settings',   label:'Настройки'},
@@ -2126,7 +2186,6 @@ function UserCabinet({auth:initialAuth,onLogout}){
           );
           if(tab==='overview')   return hasBiz?<OverviewTab  auth={authData} period={period} bizFilter={bizName} allBusinesses={businesses}/>:<NoBizCard/>;
           if(tab==='leads')      return hasBiz?<LeadsTab     auth={authData} bizLock={authData.business_name}/>:<NoBizCard/>;
-          if(tab==='bookings')   return hasBiz?<BookingsTab  auth={authData} bizLock={authData.business_name}/>:<NoBizCard/>;
           if(tab==='analytics')  return hasBiz?<AnalyticsTab auth={authData}/>:<NoBizCard/>;
           return null;
         })()}

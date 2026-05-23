@@ -1,3 +1,4 @@
+import asyncio
 import csv
 import io
 import json
@@ -9,6 +10,7 @@ import base64
 import time
 import secrets
 from datetime import datetime
+import aiohttp
 from aiohttp import web
 from sqlalchemy import select, update, delete, func, text
 from bot.models.database import AsyncSessionLocal
@@ -113,6 +115,19 @@ def check_auth_flexible(request):
     if payload and payload.get("user_id"):
         return (False, int(payload["user_id"]))
     return None
+
+
+async def fire_webhook(payload: dict):
+    async with AsyncSessionLocal() as session:
+        row = await session.scalar(select(Setting).where(Setting.key == "webhook_url"))
+        url = row.value.strip() if row and row.value else ""
+    if not url:
+        return
+    try:
+        async with aiohttp.ClientSession() as client:
+            await client.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=5))
+    except Exception:
+        pass
 
 
 def cors(response):
@@ -516,11 +531,14 @@ async def list_leads(request):
 
         lead_ids = [l.id for l in leads]
         booking_result = await session.execute(
-            select(Booking.lead_id, func.max(Booking.scheduled_at).label("scheduled_at"))
+            select(Booking.id, Booking.lead_id, Booking.scheduled_at, Booking.status)
             .where(Booking.lead_id.in_(lead_ids))
-            .group_by(Booking.lead_id)
+            .order_by(Booking.scheduled_at.desc())
         )
-        scheduled_map = {row.lead_id: row.scheduled_at for row in booking_result.all()}
+        booking_map = {}
+        for row in booking_result.all():
+            if row.lead_id not in booking_map:
+                booking_map[row.lead_id] = {"booking_id": row.id, "scheduled_at": row.scheduled_at, "booking_status": row.status}
 
         data = [
             {
@@ -532,7 +550,9 @@ async def list_leads(request):
                 "full_name": l.full_name or "",
                 "status": l.status or "COLD",
                 "phone": l.phone or "",
-                "scheduled_at": scheduled_map[l.id].isoformat() if scheduled_map.get(l.id) else None,
+                "booking_id": booking_map[l.id]["booking_id"] if l.id in booking_map else None,
+                "scheduled_at": booking_map[l.id]["scheduled_at"].isoformat() if l.id in booking_map and booking_map[l.id]["scheduled_at"] else None,
+                "booking_status": booking_map[l.id]["booking_status"] if l.id in booking_map else None,
                 "last_active": l.last_active.isoformat() if l.last_active else None,
                 "created_at": l.created_at.isoformat() if l.created_at else None,
             }
@@ -602,6 +622,8 @@ async def update_lead_status(request):
     async with AsyncSessionLocal() as session:
         await session.execute(update(Lead).where(Lead.id == lead_id).values(status=status))
         await session.commit()
+    if status == "HOT":
+        asyncio.create_task(fire_webhook({"event": "lead_hot", "lead_id": lead_id, "status": status}))
     return cors(web.json_response({"message": f"Статус изменён на {status}"}))
 
 
@@ -655,7 +677,31 @@ async def update_booking_status(request):
     async with AsyncSessionLocal() as session:
         await session.execute(update(Booking).where(Booking.id == booking_id).values(status=status))
         await session.commit()
+    asyncio.create_task(fire_webhook({"event": "booking_status", "booking_id": booking_id, "status": status}))
     return cors(web.json_response({"message": f"Статус изменён на {status}"}))
+
+
+async def get_settings_webhook(request):
+    if not check_auth_flexible(request):
+        return cors(web.json_response({"error": "Не авторизован"}, status=401))
+    async with AsyncSessionLocal() as session:
+        row = await session.scalar(select(Setting).where(Setting.key == "webhook_url"))
+        return cors(web.json_response({"url": row.value if row else ""}))
+
+
+async def post_settings_webhook(request):
+    if not check_auth_flexible(request):
+        return cors(web.json_response({"error": "Не авторизован"}, status=401))
+    body = await request.json()
+    url = body.get("url", "").strip()
+    async with AsyncSessionLocal() as session:
+        row = await session.scalar(select(Setting).where(Setting.key == "webhook_url"))
+        if row:
+            row.value = url
+        else:
+            session.add(Setting(key="webhook_url", value=url))
+        await session.commit()
+    return cors(web.json_response({"ok": True}))
 
 
 # ─── Analytics ────────────────────────────────────────────────────────────────
@@ -860,6 +906,29 @@ async def post_settings_templates(request):
     return cors(web.json_response({"ok": True}))
 
 
+async def get_settings_webhook(request):
+    if not check_auth_flexible(request):
+        return cors(web.json_response({"error": "Не авторизован"}, status=401))
+    async with AsyncSessionLocal() as session:
+        row = await session.scalar(select(Setting).where(Setting.key == "webhook_url"))
+        return cors(web.json_response({"url": row.value if row else ""}))
+
+
+async def post_settings_webhook(request):
+    if not check_auth_flexible(request):
+        return cors(web.json_response({"error": "Не авторизован"}, status=401))
+    body = await request.json()
+    url = body.get("url", "").strip()
+    async with AsyncSessionLocal() as session:
+        row = await session.scalar(select(Setting).where(Setting.key == "webhook_url"))
+        if row:
+            row.value = url
+        else:
+            session.add(Setting(key="webhook_url", value=url))
+        await session.commit()
+    return cors(web.json_response({"ok": True}))
+
+
 # ─── Router ───────────────────────────────────────────────────────────────────
 
 def create_app() -> web.Application:
@@ -922,6 +991,9 @@ def create_app() -> web.Application:
     app.router.add_post("/api/settings/templates", post_settings_templates)
     app.router.add_route("OPTIONS", "/api/settings/keywords", handle_options)
     app.router.add_route("OPTIONS", "/api/settings/templates", handle_options)
+    app.router.add_get("/api/settings/webhook", get_settings_webhook)
+    app.router.add_post("/api/settings/webhook", post_settings_webhook)
+    app.router.add_route("OPTIONS", "/api/settings/webhook", handle_options)
 
     # OPTIONS после всех маршрутов чтобы не перехватывал GET
     app.router.add_route("OPTIONS", "/{path_info:.*}", handle_options)
