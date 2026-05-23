@@ -2036,7 +2036,7 @@ function UserCabinet({auth:initialAuth,onLogout}){
 
   const bizName=bizFilter==='all'?authData.business_name||'':bizFilter;
 
-  const noControls=tab==='settings'||tab==='telephony';
+  const noControls=tab==='settings';
   const tabs=[
     {key:'overview',   label:'Обзор'},
     {key:'leads',      label:'Лиды'},
