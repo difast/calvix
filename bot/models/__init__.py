@@ -3,6 +3,7 @@ from bot.models.business import Business
 from bot.models.lead import Lead
 from bot.models.message import Message
 from bot.models.booking import Booking
+from bot.models.settings import Setting
 
 __all__ = [
     "Base",
@@ -13,4 +14,5 @@ __all__ = [
     "Lead",
     "Message",
     "Booking",
+    "Setting",
 ]

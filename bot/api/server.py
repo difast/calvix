@@ -17,6 +17,7 @@ from bot.models.lead import Lead
 from bot.models.message import Message
 from bot.models.booking import Booking
 from bot.models.user import User
+from bot.models.settings import Setting
 
 logger = logging.getLogger(__name__)
 
@@ -614,6 +615,76 @@ async def _reload_bots():
             logger.error(f"Ошибка перезагрузки через API: {e}")
 
 
+# ─── Settings ─────────────────────────────────────────────────────────────────
+
+DEFAULT_KEYWORDS = {
+    "hot": "купить, цена, оплатить, договор, счет, покупка, хочу заказать, нужен срочно, записаться, хочу записаться, созвон, встретиться, позвоните, демо, покажите, запишите, запись, хочу попробовать, когда можно начать, как записаться, хочу начать, готов начать, оформить",
+    "warm": "интересно, расскажите, как работает, пример, сравнение, стоимость, есть ли скидка, возможно ли, автоматизация, хочу узнать, подробнее, а если, сколько стоит, какая цена, что входит, расскажи",
+    "cold": "не надо, не интересно, потом, не сейчас, не нужно, отпишитесь, спам, отказаться",
+}
+
+DEFAULT_TEMPLATES = json.dumps([
+    {"id": 1, "name": "Приветствие", "text": "Привет! Я — AI-ассистент. Чем могу помочь?"},
+    {"id": 2, "name": "Запись на созвон", "text": "Отлично! Давайте запишем вас на созвон. В какое время удобно?"},
+    {"id": 3, "name": "Прощание", "text": "Спасибо за обращение! Если появятся вопросы — пишите. 🚀"},
+])
+
+
+async def get_settings_keywords(request):
+    async with AsyncSessionLocal() as session:
+        result = {}
+        for k in ["keywords_hot", "keywords_warm", "keywords_cold"]:
+            row = await session.scalar(select(Setting).where(Setting.key == k))
+            ktype = k.replace("keywords_", "")
+            result[ktype] = row.value if row else DEFAULT_KEYWORDS.get(ktype, "")
+    return cors(web.json_response(result))
+
+
+async def post_settings_keywords(request):
+    body = await request.json()
+    async with AsyncSessionLocal() as session:
+        for ktype in ["hot", "warm", "cold"]:
+            val = body.get(ktype, "").strip()
+            if not val:
+                continue
+            key = f"keywords_{ktype}"
+            row = await session.scalar(select(Setting).where(Setting.key == key))
+            if row:
+                row.value = val
+            else:
+                session.add(Setting(key=key, value=val))
+        await session.commit()
+    # Invalidate cache in lead_scoring
+    from bot.services.lead_scoring import LeadScoringService
+    LeadScoringService.invalidate_cache()
+    return cors(web.json_response({"ok": True}))
+
+
+async def get_settings_templates(request):
+    async with AsyncSessionLocal() as session:
+        row = await session.scalar(select(Setting).where(Setting.key == "templates"))
+        val = row.value if row else DEFAULT_TEMPLATES
+    try:
+        data = json.loads(val)
+    except Exception:
+        data = []
+    return cors(web.json_response({"templates": data}))
+
+
+async def post_settings_templates(request):
+    body = await request.json()
+    templates = body.get("templates", [])
+    async with AsyncSessionLocal() as session:
+        row = await session.scalar(select(Setting).where(Setting.key == "templates"))
+        val = json.dumps(templates, ensure_ascii=False)
+        if row:
+            row.value = val
+        else:
+            session.add(Setting(key="templates", value=val))
+        await session.commit()
+    return cors(web.json_response({"ok": True}))
+
+
 # ─── Router ───────────────────────────────────────────────────────────────────
 
 def create_app() -> web.Application:
@@ -657,6 +728,14 @@ def create_app() -> web.Application:
 
     # Utils
     app.router.add_post("/api/reload", reload_bots)
+
+    # Settings
+    app.router.add_get("/api/settings/keywords", get_settings_keywords)
+    app.router.add_post("/api/settings/keywords", post_settings_keywords)
+    app.router.add_get("/api/settings/templates", get_settings_templates)
+    app.router.add_post("/api/settings/templates", post_settings_templates)
+    app.router.add_route("OPTIONS", "/api/settings/keywords", handle_options)
+    app.router.add_route("OPTIONS", "/api/settings/templates", handle_options)
 
     # OPTIONS после всех маршрутов чтобы не перехватывал GET
     app.router.add_route("OPTIONS", "/{path_info:.*}", handle_options)

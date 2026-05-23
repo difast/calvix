@@ -1362,6 +1362,18 @@ function SettingsTab({auth}){
   const [kw,setKw]=React.useState({hot:defHot,warm:defWarm,cold:defCold});
   const [kwMsg,setKwMsg]=React.useState(null);
   const [kwSaving,setKwSaving]=React.useState(false);
+  const [kwLoading,setKwLoading]=React.useState(true);
+
+  React.useEffect(()=>{
+    fetch(API_BASE+'/api/settings/keywords').then(r=>r.json()).then(d=>{
+      if(d.hot||d.warm||d.cold) setKw({hot:d.hot||defHot,warm:d.warm||defWarm,cold:d.cold||defCold});
+      setKwLoading(false);
+    }).catch(()=>setKwLoading(false));
+    fetch(API_BASE+'/api/settings/templates').then(r=>r.json()).then(d=>{
+      if(d.templates&&d.templates.length) setTpls(d.templates);
+    }).catch(()=>{});
+  },[]);
+
   async function saveKw(){
     setKwSaving(true);setKwMsg(null);
     try{

@@ -47,6 +47,9 @@ def create_message_router() -> Router:
 
         business_id = kwargs.get("business_id", 1)
         prompt = kwargs.get("business_prompt", "Ты ассистент по продажам. Отвечай по-русски.")
+
+        # Load keywords from DB if not cached
+        await LeadScoringService._load_keywords()
         business = kwargs.get("business")
         business_name = business.name if business else str(business_id)
 
