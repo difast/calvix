@@ -102,6 +102,19 @@ def require_user_auth(handler):
     return wrapper
 
 
+def check_auth_flexible(request):
+    """Returns (is_admin, user_id) or None if unauthorized. Accepts X-API-Secret or Bearer token."""
+    secret = request.headers.get("X-API-Secret", "")
+    if secret == API_SECRET:
+        return (True, None)
+    auth_header = request.headers.get("Authorization", "")
+    token = auth_header.replace("Bearer ", "").strip()
+    payload = verify_user_token(token)
+    if payload and payload.get("user_id"):
+        return (False, int(payload["user_id"]))
+    return None
+
+
 def cors(response):
     response.headers["Access-Control-Allow-Origin"] = "*"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-API-Secret, Authorization"
@@ -329,11 +342,23 @@ async def change_admin_password(request):
 
 # ─── Businesses ───────────────────────────────────────────────────────────────
 
-@require_auth
 async def list_businesses(request):
+    ctx = check_auth_flexible(request)
+    if not ctx:
+        return cors(web.json_response({"error": "Не авторизован"}, status=401))
+    is_admin, user_id = ctx
+
     async with AsyncSessionLocal() as session:
-        result = await session.execute(select(Business).order_by(Business.id))
-        businesses = result.scalars().all()
+        if is_admin:
+            result = await session.execute(select(Business).order_by(Business.id))
+            businesses = result.scalars().all()
+        else:
+            user = await session.get(User, user_id)
+            if user and user.business_id:
+                biz = await session.get(Business, user.business_id)
+                businesses = [biz] if biz else []
+            else:
+                businesses = []
 
         stats = {}
         for b in businesses:
@@ -364,8 +389,12 @@ async def list_businesses(request):
     return cors(web.json_response(data))
 
 
-@require_auth
 async def create_business(request):
+    ctx = check_auth_flexible(request)
+    if not ctx:
+        return cors(web.json_response({"error": "Не авторизован"}, status=401))
+    is_admin, user_id = ctx
+
     body = await request.json()
     token = body.get("bot_token", "").strip()
     name = body.get("name", "").strip()
@@ -391,15 +420,30 @@ async def create_business(request):
         await session.refresh(b)
         biz_id = b.id
 
+        if not is_admin and user_id:
+            user = await session.get(User, user_id)
+            if user:
+                user.business_id = biz_id
+                await session.commit()
+
     await _reload_bots()
     return cors(web.json_response({"id": biz_id, "message": "Бизнес создан"}, status=201))
 
 
-@require_auth
 async def update_business(request):
+    ctx = check_auth_flexible(request)
+    if not ctx:
+        return cors(web.json_response({"error": "Не авторизован"}, status=401))
+    is_admin, user_id = ctx
     biz_id = int(request.match_info["id"])
-    body = await request.json()
 
+    if not is_admin:
+        async with AsyncSessionLocal() as s:
+            user = await s.get(User, user_id)
+            if not user or user.business_id != biz_id:
+                return cors(web.json_response({"error": "Нет доступа"}, status=403))
+
+    body = await request.json()
     fields = {}
     for key in ("name", "bot_token", "system_prompt", "welcome_message", "manager_link", "is_active"):
         if key in body:
@@ -416,11 +460,23 @@ async def update_business(request):
     return cors(web.json_response({"message": "Обновлено"}))
 
 
-@require_auth
 async def delete_business(request):
+    ctx = check_auth_flexible(request)
+    if not ctx:
+        return cors(web.json_response({"error": "Не авторизован"}, status=401))
+    is_admin, user_id = ctx
     biz_id = int(request.match_info["id"])
+
+    if not is_admin:
+        async with AsyncSessionLocal() as s:
+            user = await s.get(User, user_id)
+            if not user or user.business_id != biz_id:
+                return cors(web.json_response({"error": "Нет доступа"}, status=403))
+
     async with AsyncSessionLocal() as session:
         await session.execute(delete(Business).where(Business.id == biz_id))
+        if not is_admin and user_id:
+            await session.execute(update(User).where(User.id == user_id).values(business_id=None))
         await session.commit()
 
     await _reload_bots()
@@ -509,8 +565,9 @@ async def export_leads_csv(request):
     ))
 
 
-@require_auth
 async def get_lead_history(request):
+    if not check_auth_flexible(request):
+        return cors(web.json_response({"error": "Не авторизован"}, status=401))
     lead_id = int(request.match_info["id"])
     async with AsyncSessionLocal() as session:
         result = await session.execute(
@@ -593,8 +650,9 @@ async def update_booking_status(request):
 
 # ─── Analytics ────────────────────────────────────────────────────────────────
 
-@require_auth
 async def analytics_funnel(request):
+    if not check_auth_flexible(request):
+        return cors(web.json_response({"error": "Не авторизован"}, status=401))
     business_id = request.rel_url.query.get("business_id")
 
     async with AsyncSessionLocal() as session:
@@ -623,8 +681,9 @@ async def analytics_funnel(request):
     }))
 
 
-@require_auth
 async def analytics_leads_by_day(request):
+    if not check_auth_flexible(request):
+        return cors(web.json_response({"error": "Не авторизован"}, status=401))
     business_id = request.rel_url.query.get("business_id")
     days = int(request.rel_url.query.get("days", 14))
 
@@ -644,8 +703,9 @@ async def analytics_leads_by_day(request):
     return cors(web.json_response(data))
 
 
-@require_auth
 async def analytics_trigger_words(request):
+    if not check_auth_flexible(request):
+        return cors(web.json_response({"error": "Не авторизован"}, status=401))
     business_id = request.rel_url.query.get("business_id")
 
     async with AsyncSessionLocal() as session:
@@ -674,8 +734,9 @@ async def analytics_trigger_words(request):
 
 # ─── Platform ─────────────────────────────────────────────────────────────────
 
-@require_auth
 async def platform_status(request):
+    if not check_auth_flexible(request):
+        return cors(web.json_response({"error": "Не авторизован"}, status=401))
     async with AsyncSessionLocal() as session:
         businesses = (await session.execute(select(Business))).scalars().all()
         total_leads = await session.scalar(select(func.count()).select_from(Lead))

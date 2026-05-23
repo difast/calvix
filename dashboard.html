@@ -341,6 +341,37 @@ tbody tr.clickable:hover td,tbody tr:hover td{background:var(--bg-hover);}
 .coming-sub{font-size:14px;color:var(--ink-3);line-height:1.7;}
 .coming-badge{display:inline-flex;margin-top:20px;padding:6px 16px;border-radius:999px;font-size:12px;font-weight:600;background:rgba(22,163,74,.1);color:var(--accent);border:1px solid rgba(22,163,74,.2);}
 
+/* ── Dark theme ── */
+body.dark{
+  --bg-page:#111c15;
+  --bg-card:#182519;
+  --bg-hover:#1f3225;
+  --bg-dg:#090f0a;
+  --bg-dg2:#0d1810;
+  --line:#253c2b;
+  --ink:#dceee4;
+  --ink-2:#a8ccb7;
+  --ink-3:#5a8a6e;
+  --ink-4:#365249;
+  --inv-2:rgba(220,238,228,.78);
+  --inv-3:rgba(220,238,228,.38);
+  --shadow:0 1px 4px rgba(0,0,0,.4),0 4px 18px rgba(0,0,0,.35);
+  --shadow-lg:0 8px 36px rgba(0,0,0,.6);
+  --danger-lt:#1e1212;
+  --danger-line:#4a2424;
+  --c1d:rgba(22,163,74,.18);
+  --c2d:rgba(99,102,241,.18);
+  --c3d:rgba(249,115,22,.18);
+  --c4d:rgba(14,165,233,.18);
+  --c5d:rgba(236,72,153,.18);
+}
+body.dark .auth-card{border:1px solid var(--line);}
+body.dark .field input,body.dark .filter-input,body.dark .filter-select{background:var(--bg-page);}
+body.dark thead th{background:var(--bg-hover);}
+body.dark .auth-page{background:linear-gradient(135deg,#090f0a,#0e1a10 50%,#090f0a);}
+body.dark .auth-admin-btn{background:rgba(255,255,255,.04);border-color:var(--line);color:var(--ink-2);}
+body.dark .auth-admin-btn:hover{background:rgba(255,255,255,.08);}
+body.dark select option{background:#182519;}
 @media print{
   .header,.nav-bar,.controls,.filters-bar,.export-row,.pagination,.modal-overlay{display:none!important;}
   .table-wrap{box-shadow:none;border:1px solid #ccc;}
@@ -357,6 +388,11 @@ const AUTH_KEY  = 'calvix_auth_v2';
 function loadAuth(){try{const v=JSON.parse(localStorage.getItem(AUTH_KEY));return(v&&(v.token||v.secret))?v:null;}catch{return null;}}
 function saveAuth(a){localStorage.setItem(AUTH_KEY,JSON.stringify(a));}
 function clearAuth(){localStorage.removeItem(AUTH_KEY);}
+
+const THEME_KEY='calvix_theme';
+function getTheme(){return localStorage.getItem(THEME_KEY)||'light';}
+function applyTheme(t){document.body.classList.toggle('dark',t==='dark');localStorage.setItem(THEME_KEY,t);}
+applyTheme(getTheme());
 
 function fmtDate(s){
   if(!s)return'—';
@@ -420,6 +456,13 @@ async function sbPatch(table, id, body){
       method:'PATCH',headers:{...SB_H,'Content-Type':'application/json'},body:JSON.stringify(body)
     });
   }catch(e){console.error('[SB] Patch error',table,e);}
+}
+
+function authHeaders(auth,extra={}){
+  const h={'Content-Type':'application/json',...extra};
+  if(auth&&auth.secret) h['X-API-Secret']=auth.secret;
+  else if(auth&&auth.token) h['Authorization']=`Bearer ${auth.token}`;
+  return h;
 }
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
@@ -546,7 +589,7 @@ function LeadHistoryModal({lead,auth,onClose,onStatusChange}){
   const bodyRef=React.useRef(null);
 
   React.useEffect(()=>{
-    fetch(API_BASE+`/api/leads/${lead.id}/history`,{headers:{'X-API-Secret':auth.secret||''}})
+    fetch(API_BASE+`/api/leads/${lead.id}/history`,{headers:authHeaders(auth)})
       .then(r=>{if(!r.ok)throw new Error();return r.json();})
       .then(d=>{setMessages(Array.isArray(d)?d:[]);setLoading(false);})
       .catch(()=>{
@@ -625,7 +668,7 @@ function OverviewTab({auth,period,bizFilter,allBusinesses=[]}){
       sbCount('bookings',{...bq}),
       sbGet('hot_leads',{select:'*',status:'eq.HOT',order:'created_at.desc',limit:10,...bq,...(dateFrom?{'created_at':`gte.${dateFrom}`}:{})}),
       sbGet('bookings',{select:'*',order:'created_at.desc',limit:10,...bq}),
-      fetch(API_BASE+'/api/platform/status',{headers:{'X-API-Secret':auth?.secret||''}}).then(r=>r.ok?r.json():null).catch(()=>null),
+      fetch(API_BASE+'/api/platform/status',{headers:authHeaders(auth)}).then(r=>r.ok?r.json():null).catch(()=>null),
     ]);
     setKpi({total:cAll,hot:cHot,bookings:cBook,today:cToday});
     setHotLeads(rLeads.data);
@@ -929,7 +972,7 @@ function AnalyticsTab({auth}){
   const [loading,setLoading]=React.useState(false);
 
   React.useEffect(()=>{
-    fetch(API_BASE+'/api/businesses',{headers:{'X-API-Secret':auth.secret||''}})
+    fetch(API_BASE+'/api/businesses',{headers:authHeaders(auth)})
       .then(r=>r.json()).then(d=>setBusinesses(Array.isArray(d.businesses)?d.businesses:Array.isArray(d)?d:[])).catch(()=>{});
   },[]);
 
@@ -938,7 +981,7 @@ function AnalyticsTab({auth}){
   async function load(){
     setLoading(true);
     const p=bizFilter?`&business_id=${bizFilter}`:'';
-    const h={'X-API-Secret':auth.secret||''};
+    const h=authHeaders(auth);
     try{
       const [rf,rd,rw]=await Promise.all([
         fetch(API_BASE+`/api/analytics/funnel?${p}`,{headers:h}).then(r=>r.json()),
@@ -1183,7 +1226,7 @@ function PlatformModal({auth,onClose}){
   const emptyForm={bot_token:'',name:'',system_prompt:'',welcome_message:'',manager_link:'@akovpyat',is_active:true};
   const [form,setForm]=React.useState(emptyForm);
 
-  const H={'Content-Type':'application/json','X-API-Secret':auth.secret||''};
+  const H=authHeaders(auth);
 
   async function load(){
     setLoading(true);
@@ -1368,7 +1411,8 @@ function PlatformModal({auth,onClose}){
 
 // ── Settings Tab ─────────────────────────────────────────────────────────────
 function SettingsTab({auth}){
-  const H={'Content-Type':'application/json','X-API-Secret':auth?.secret||''};
+  const H=authHeaders(auth);
+  const isAdmin=auth?.role==='admin';
   const inp={width:'100%',padding:'9px 12px',borderRadius:'var(--radius-sm)',border:'1px solid var(--line)',background:'var(--bg-page)',color:'var(--ink)',font:'inherit',fontSize:13,outline:'none',boxSizing:'border-box',transition:'border-color .15s'};
   const lbl={fontSize:11,fontWeight:600,color:'var(--ink-3)',textTransform:'uppercase',letterSpacing:'.05em',display:'block',marginBottom:5};
   const sec=(icon,title,sub,children)=>(
@@ -1381,16 +1425,19 @@ function SettingsTab({auth}){
     </div>
   );
 
+  // ── Тема ──────────────────────────────────────────────────────────────────
+  const [theme,setThemeState]=React.useState(getTheme);
+  function toggleThemeSetting(t){setThemeState(t);applyTheme(t);}
+
   // ── 1. Профиль администратора ──────────────────────────────────────────────
   const [pwd,setPwd]=React.useState({cur:'',next:'',rep:''});
   const [pwdMsg,setPwdMsg]=React.useState(null);
-  const [email,setEmail]=React.useState('');
   async function savePwd(e){
     e.preventDefault();
     if(pwd.next!==pwd.rep){setPwdMsg({ok:false,t:'Пароли не совпадают'});return;}
     if(pwd.next.length<6){setPwdMsg({ok:false,t:'Минимум 6 символов'});return;}
     try{
-      const r=await fetch(API_BASE+'/api/admin/password',{method:'POST',headers:H,body:JSON.stringify({current:pwd.cur,new_password:pwd.next})});
+      const r=await fetch(API_BASE+'/api/admin/password',{method:'PUT',headers:H,body:JSON.stringify({new_password:pwd.next})});
       if(r.ok){setPwdMsg({ok:true,t:'Пароль обновлён'});setPwd({cur:'',next:'',rep:''});}
       else{const d=await r.json();setPwdMsg({ok:false,t:d.error||'Ошибка'});}
     }catch{setPwdMsg({ok:true,t:'Запрос отправлен'});}
@@ -1459,10 +1506,23 @@ function SettingsTab({auth}){
 
   return(
     <div style={{maxWidth:800}}>
-      {sec('👤','Профиль администратора','Смена пароля для входа в панель',
+      {sec('🎨','Оформление','Выбор темы интерфейса',
+        <div style={{display:'flex',gap:12}}>
+          {[['light','☀️ Светлая','Классический светлый интерфейс'],['dark','🌙 Тёмная','Тёмный режим, мягкие цвета']].map(([v,l,d])=>(
+            <div key={v} onClick={()=>toggleThemeSetting(v)} style={{flex:1,padding:'14px 18px',borderRadius:'var(--radius)',border:`2px solid ${theme===v?'var(--accent)':'var(--line)'}`,cursor:'pointer',transition:'all .15s',background:theme===v?'var(--c1d)':'var(--bg-page)',display:'flex',alignItems:'center',gap:12}}>
+              <span style={{fontSize:24}}>{l.split(' ')[0]}</span>
+              <div>
+                <div style={{fontWeight:600,fontSize:13,color:theme===v?'var(--accent)':'var(--ink-2)'}}>{l.split(' ').slice(1).join(' ')}</div>
+                <div style={{fontSize:11,color:'var(--ink-4)',marginTop:2}}>{d}</div>
+              </div>
+              {theme===v&&<span style={{marginLeft:'auto',width:16,height:16,borderRadius:'50%',background:'var(--accent)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,color:'#fff',flexShrink:0}}>✓</span>}
+            </div>
+          ))}
+        </div>
+      )}
+      {isAdmin&&sec('👤','Профиль администратора','Смена пароля для входа в панель',
         <form onSubmit={savePwd}>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:14,marginBottom:4}}>
-            <div><label style={lbl}>Текущий пароль</label><input style={inp} type="password" value={pwd.cur} onChange={e=>setPwd(p=>({...p,cur:e.target.value}))} required/></div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginBottom:4}}>
             <div><label style={lbl}>Новый пароль</label><input style={inp} type="password" value={pwd.next} onChange={e=>setPwd(p=>({...p,next:e.target.value}))} required/></div>
             <div><label style={lbl}>Повторите пароль</label><input style={inp} type="password" value={pwd.rep} onChange={e=>setPwd(p=>({...p,rep:e.target.value}))} required/></div>
           </div>
@@ -1544,6 +1604,7 @@ function SettingsTab({auth}){
 // ── Profile Dropdown ─────────────────────────────────────────────────────────
 function ProfileDropdown({auth,onLogout,onEditProfile,onChangePassword}){
   const [open,setOpen]=React.useState(false);
+  const [theme,setTheme]=React.useState(getTheme);
   const ref=React.useRef(null);
   React.useEffect(()=>{
     function h(e){if(ref.current&&!ref.current.contains(e.target))setOpen(false);}
@@ -1552,6 +1613,8 @@ function ProfileDropdown({auth,onLogout,onEditProfile,onChangePassword}){
   },[]);
   const initials=(auth.full_name||auth.phone||auth.email||'?').slice(0,2).toUpperCase();
   const displayName=auth.full_name||(auth.role==='admin'?'Администратор':auth.phone||auth.email||'Профиль');
+  function toggleTheme(){const t=theme==='light'?'dark':'light';setTheme(t);applyTheme(t);setOpen(false);}
+  const isDark=theme==='dark';
   return(
     <div style={{position:'relative'}} ref={ref}>
       <button className="profile-btn" onClick={()=>setOpen(o=>!o)}>
@@ -1569,6 +1632,10 @@ function ProfileDropdown({auth,onLogout,onEditProfile,onChangePassword}){
           <div className="dropdown-sep"/>
           {auth.role!=='admin'&&<button className="dropdown-item" onClick={()=>{setOpen(false);onEditProfile();}}>✏️ Редактировать профиль</button>}
           <button className="dropdown-item" onClick={()=>{setOpen(false);onChangePassword();}}>🔑 Сменить пароль</button>
+          <button className="dropdown-item" onClick={toggleTheme}>
+            {isDark?'☀️ Светлая тема':'🌙 Тёмная тема'}
+            <span style={{marginLeft:'auto',fontSize:10,padding:'2px 7px',borderRadius:4,background:isDark?'rgba(250,204,21,.12)':'rgba(99,102,241,.1)',color:isDark?'#ca8a04':'var(--c2)',fontWeight:600,border:`1px solid ${isDark?'rgba(250,204,21,.2)':'rgba(99,102,241,.2)'}`}}>{isDark?'Светло':'Темно'}</span>
+          </button>
           {auth.role!=='admin'&&<>
             <div className="dropdown-sep"/>
             <button className="dropdown-item" onClick={()=>setOpen(false)}>
@@ -1984,23 +2051,39 @@ function UserCabinet({auth:initialAuth,onLogout}){
   const [authData,setAuthData]=React.useState(initialAuth);
   const [tab,setTab]=React.useState('overview');
   const [period,setPeriod]=React.useState('week');
+  const [bizFilter,setBiz]=React.useState('all');
+  const [businesses,setBusinesses]=React.useState([]);
+  const [showPlatform,setShowPlatform]=React.useState(false);
   const [showProfile,setShowProfile]=React.useState(false);
   const [showChangePw,setShowChangePw]=React.useState(false);
   const [showOnboarding,setShowOnboarding]=React.useState(!initialAuth.full_name);
 
-  const bizName=authData.business_name||'';
+  function reloadBusinesses(){
+    fetch(API_BASE+'/api/businesses',{headers:authHeaders(authData)})
+      .then(r=>r.json()).then(d=>{
+        const arr=Array.isArray(d.businesses)?d.businesses:Array.isArray(d)?d:[];
+        setBusinesses(arr);
+        if(arr.length===1&&!authData.business_name){
+          const updated={...authData,business_name:arr[0].name,business_id:arr[0].id};
+          setAuthData(updated);saveAuth(updated);
+        }
+      }).catch(()=>{});
+  }
+  React.useEffect(()=>{reloadBusinesses();},[]);
 
+  const bizName=bizFilter==='all'?authData.business_name||'':bizFilter;
+
+  const noControls=tab==='settings'||tab==='telephony';
   const tabs=[
     {key:'overview',   label:'Обзор'},
     {key:'leads',      label:'Лиды'},
     {key:'bookings',   label:'Бронирования'},
     {key:'analytics',  label:'Аналитика'},
+    {key:'telephony',  label:'Телефония'},
+    {key:'settings',   label:'Настройки'},
   ];
 
-  function handleSave(updated){
-    setAuthData(updated);
-    saveAuth(updated);
-  }
+  function handleSave(updated){setAuthData(updated);saveAuth(updated);}
 
   return(
     <div className="shell">
@@ -2014,22 +2097,30 @@ function UserCabinet({auth:initialAuth,onLogout}){
             </div>
           </div>
           <div className="header-right">
+            <button className="hdr-btn" onClick={()=>setShowPlatform(true)}>⚙️ Платформа</button>
             <ProfileDropdown auth={authData} onLogout={onLogout} onEditProfile={()=>setShowProfile(true)} onChangePassword={()=>setShowChangePw(true)}/>
           </div>
         </div>
       </header>
 
-      {tab!=='settings'&&(
+      {!noControls&&(
         <div className="controls">
           <div className="controls-inner">
-            <span className="ctrl-label">Период:</span>
+            {businesses.length>1&&<>
+              <span className="ctrl-label">Бизнес:</span>
+              <select className="sel" value={bizFilter} onChange={e=>setBiz(e.target.value)}>
+                <option value="all">Все бизнесы</option>
+                {businesses.map(b=><option key={b.id} value={b.name}>{b.name}</option>)}
+              </select>
+            </>}
+            <span className="ctrl-label" style={{marginLeft:businesses.length>1?8:0}}>Период:</span>
             <div className="seg">
               {[['today','Сегодня'],['week','Неделя'],['month','Месяц'],['all','Всё время']].map(([v,l])=>(
                 <button key={v} className={period===v?'on':''} onClick={()=>setPeriod(v)}>{l}</button>
               ))}
             </div>
             <div className="ctrl-spacer"/>
-            {bizName&&<span style={{fontSize:11,color:'rgba(255,255,255,.35)',borderLeft:'1px solid rgba(255,255,255,.12)',paddingLeft:12}}>📡 {bizName}</span>}
+            {authData.business_name&&<span style={{fontSize:11,color:'rgba(255,255,255,.35)',borderLeft:'1px solid rgba(255,255,255,.12)',paddingLeft:12}}>📡 {authData.business_name}</span>}
           </div>
         </div>
       )}
@@ -2042,17 +2133,28 @@ function UserCabinet({auth:initialAuth,onLogout}){
         </div>
       </nav>
 
+      {showPlatform&&<PlatformModal auth={authData} onClose={()=>{setShowPlatform(false);reloadBusinesses();}}/>}
+
       <div className="page">
-        {!bizName&&tab==='overview'&&(
-          <div style={{background:'#fffbe6',border:'1px solid #ffe58f',borderRadius:'var(--radius)',padding:'14px 20px',marginBottom:20,fontSize:13,color:'#92400e',display:'flex',alignItems:'center',gap:10}}>
-            <span>⚠️</span>
-            <span>Бизнес не привязан к вашему аккаунту. Обратитесь к администратору для настройки доступа.</span>
+        {!authData.business_name&&!showPlatform&&tab==='overview'&&(
+          <div style={{background:'rgba(250,204,21,.08)',border:'1px solid rgba(250,204,21,.25)',borderRadius:'var(--radius)',padding:'14px 20px',marginBottom:20,fontSize:13,color:'var(--ink-2)',display:'flex',alignItems:'center',gap:12}}>
+            <span style={{fontSize:20}}>⚡</span>
+            <div><strong>Создайте первого бота!</strong> Нажмите кнопку <strong>⚙️ Платформа</strong> в шапке, чтобы добавить бизнес и запустить AI-продавца.</div>
           </div>
         )}
-        {tab==='overview'  &&<OverviewTab  auth={authData} period={period} bizFilter={bizName} allBusinesses={[]}/>}
+        {tab==='overview'  &&<OverviewTab  auth={authData} period={period} bizFilter={bizName} allBusinesses={businesses}/>}
         {tab==='leads'     &&<LeadsTab     auth={authData}/>}
         {tab==='bookings'  &&<BookingsTab  auth={authData}/>}
         {tab==='analytics' &&<AnalyticsTab auth={authData}/>}
+        {tab==='telephony' &&(
+          <div className="coming-card">
+            <div className="coming-icon">📞</div>
+            <div className="coming-title">Телефония</div>
+            <div className="coming-sub">Интеграция с IP-телефонией, запись звонков и автодозвон появятся в следующей версии.</div>
+            <span className="coming-badge">Скоро</span>
+          </div>
+        )}
+        {tab==='settings'  &&<SettingsTab  auth={authData}/>}
       </div>
 
       {showOnboarding&&<OnboardingModal auth={authData} onClose={()=>setShowOnboarding(false)} onSave={handleSave}/>}
