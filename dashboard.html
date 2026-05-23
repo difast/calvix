@@ -587,7 +587,8 @@ function LeadHistoryModal({lead,auth,onClose,onStatusChange}){
   const [messages,setMessages]=React.useState([]);
   const [loading,setLoading]=React.useState(true);
   const [status,setStatus]=React.useState(lead.status||'COLD');
-  const [bookingStatus,setBookingStatus]=React.useState(lead.booking_status||'pending');
+  const [booking,setBooking]=React.useState(null); // {id, scheduled_at, status}
+  const [bookingStatus,setBookingStatus]=React.useState('pending');
   const [bookingActing,setBookingActing]=React.useState(false);
   const bodyRef=React.useRef(null);
 
@@ -599,6 +600,17 @@ function LeadHistoryModal({lead,auth,onClose,onStatusChange}){
         const fallback=lead.last_message?[{role:'user',content:lead.last_message,created_at:lead.created_at}]:[];
         setMessages(fallback);setLoading(false);
       });
+    // Fetch booking from Supabase by phone+business_name
+    const p={select:'*',order:'created_at.desc',limit:1};
+    if(lead.phone) p['phone']=`eq.${lead.phone}`;
+    else if(lead.full_name) p['full_name']=`eq.${lead.full_name}`;
+    if(lead.business_name) p['business_name']=`eq.${lead.business_name}`;
+    sbGet('bookings',p).then(({data})=>{
+      if(data&&data.length){
+        setBooking(data[0]);
+        setBookingStatus(data[0].status||'pending');
+      }
+    }).catch(()=>{});
   },[lead.id]);
 
   React.useEffect(()=>{if(!loading&&bodyRef.current)bodyRef.current.scrollTop=bodyRef.current.scrollHeight;},[loading,messages]);
@@ -610,11 +622,12 @@ function LeadHistoryModal({lead,auth,onClose,onStatusChange}){
   }
 
   async function changeBookingStatus(s){
-    if(!lead.booking_id) return;
+    if(!booking) return;
     setBookingActing(true);
     try{
-      await fetch(API_BASE+`/api/bookings/${lead.booking_id}/status`,{method:'PUT',headers:authHeaders(auth),body:JSON.stringify({status:s})});
+      await sbPatch('bookings',booking.id,{status:s});
       setBookingStatus(s);
+      setBooking(b=>({...b,status:s}));
     }catch(e){}
     setBookingActing(false);
   }
@@ -647,24 +660,24 @@ function LeadHistoryModal({lead,auth,onClose,onStatusChange}){
         <div className="modal-status" style={{borderTop:'1px solid var(--line)',paddingTop:12,marginTop:0,gap:16,flexWrap:'wrap'}}>
           <div style={{display:'flex',alignItems:'center',gap:8}}>
             <span style={{fontSize:13,color:'var(--ink-3)',fontWeight:500}}>📅 Звонок/встреча:</span>
-            <span style={{fontWeight:700,color:lead.scheduled_at?'var(--c1)':'var(--ink-4)',fontSize:13}}>
-              {lead.scheduled_at?fmtDT(lead.scheduled_at):'не запланировано'}
+            <span style={{fontWeight:700,color:booking?'var(--c1)':'var(--ink-4)',fontSize:13}}>
+              {booking?(booking.scheduled_datetime||booking.scheduled_at||fmtDT(booking.created_at)):'не запланировано'}
             </span>
           </div>
-          <div style={{display:'flex',alignItems:'center',gap:8}}>
+          {booking&&<div style={{display:'flex',alignItems:'center',gap:8}}>
             <span className="modal-status-label">Встреча:</span>
             {(()=>{
               const si={pending:{l:'Ожидает',c:'badge-pending'},done:{l:'Проведён',c:'badge-done'},cancelled:{l:'Отменён',c:'badge-cancelled'}};
               return <span className={`badge ${(si[bookingStatus]||si.pending).c}`}>{(si[bookingStatus]||si.pending).l}</span>;
             })()}
-          </div>
-          <div style={{display:'flex',gap:6}}>
+          </div>}
+          {booking&&<div style={{display:'flex',gap:6}}>
             {bookingStatus==='pending'&&<>
-              <button className="btn btn-primary btn-sm" style={{fontSize:11}} disabled={bookingActing||!lead.booking_id} onClick={()=>changeBookingStatus('done')}>✅ Проведён</button>
-              <button className="btn btn-ghost btn-sm" style={{color:'var(--danger)',borderColor:'var(--danger-line)',fontSize:11}} disabled={bookingActing||!lead.booking_id} onClick={()=>changeBookingStatus('cancelled')}>❌ Отменить</button>
+              <button className="btn btn-primary btn-sm" style={{fontSize:11}} disabled={bookingActing} onClick={()=>changeBookingStatus('done')}>✅ Проведён</button>
+              <button className="btn btn-ghost btn-sm" style={{color:'var(--danger)',borderColor:'var(--danger-line)',fontSize:11}} disabled={bookingActing} onClick={()=>changeBookingStatus('cancelled')}>❌ Отменить</button>
             </>}
             {bookingStatus!=='pending'&&<button className="btn btn-ghost btn-sm" style={{fontSize:11}} disabled={bookingActing} onClick={()=>changeBookingStatus('pending')}>↩ Вернуть</button>}
-          </div>
+          </div>}
         </div>
         <div className="modal-body" ref={bodyRef}>
           {loading?<div className="spinner-wrap"><div className="spinner"/><span>Загрузка диалога…</span></div>
