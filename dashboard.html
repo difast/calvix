@@ -1207,12 +1207,12 @@ function PlatformModal({auth,onClose}){
           </div>
         </div>
         <div>
-          <label style={lbl}>Системный промпт * <span style={{color:'var(--ink-4)',fontWeight:400}}>(инструкция для AI)</span></label>
-          <textarea style={{...inp,height:180,resize:'vertical',lineHeight:1.6}} placeholder="Ты — менеджер по продажам..." value={form.system_prompt} onChange={e=>setForm(f=>({...f,system_prompt:e.target.value}))}/>
+          <label style={lbl}>Системный промпт * <span style={{color:'var(--ink-4)',fontWeight:400}}>— роль, стиль, знания о продукте. Без приветствия и правил квалификации.</span></label>
+          <textarea style={{...inp,height:180,resize:'vertical',lineHeight:1.6}} placeholder="Ты — менеджер по продажам [название]. Твоя задача — рассказывать о продукте и помогать клиенту принять решение. Отвечай коротко, по делу, без лишнего." value={form.system_prompt} onChange={e=>setForm(f=>({...f,system_prompt:e.target.value}))}/>
         </div>
         <div>
-          <label style={lbl}>Welcome-сообщение <span style={{color:'var(--ink-4)',fontWeight:400}}>(первое сообщение бота)</span></label>
-          <textarea style={{...inp,height:80,resize:'vertical'}} placeholder="Привет! Я..." value={form.welcome_message} onChange={e=>setForm(f=>({...f,welcome_message:e.target.value}))}/>
+          <label style={lbl}>Первое сообщение бота <span style={{color:'var(--ink-4)',fontWeight:400}}>— отправляется автоматически когда пользователь открывает чат</span></label>
+          <textarea style={{...inp,height:72,resize:'vertical'}} placeholder="Привет! Я помогу вам с [продукт]. Что вас интересует?" value={form.welcome_message} onChange={e=>setForm(f=>({...f,welcome_message:e.target.value}))}/>
         </div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
           <div>
@@ -1398,9 +1398,10 @@ function SettingsTab({auth}){
 
   // ── 6. Шаблоны сообщений ──────────────────────────────────────────────────
   const [tpls,setTpls]=React.useState([
-    {id:1,name:'Приветствие',text:'Привет! Я — AI-ассистент. Чем могу помочь?'},
-    {id:2,name:'Запись на созвон',text:'Отлично! Давайте запишем вас на созвон. В какое время удобно?'},
-    {id:3,name:'Прощание',text:'Спасибо за обращение! Если появятся вопросы — пишите. 🚀'},
+    {id:1,name:'Предложение созвона',text:'Давайте обсудим детали на созвоне — это займёт 15–20 минут. Когда вам удобно?'},
+    {id:2,name:'Возражение: дорого',text:'Понимаю. Давайте разберём что именно входит в стоимость — думаю, увидите что это выгодно.'},
+    {id:3,name:'Возражение: подумаю',text:'Конечно, не тороплю. Если появятся вопросы — я здесь. Могу отправить подробную информацию?'},
+    {id:4,name:'Прощание',text:'Спасибо за обращение! Если появятся вопросы — пишите. 🚀'},
   ]);
   const [tplMsg,setTplMsg]=React.useState(null);
   function updateTpl(id,field,val){setTpls(t=>t.map(x=>x.id===id?{...x,[field]:val}:x));}
@@ -1475,7 +1476,7 @@ function SettingsTab({auth}){
         </div>
       )}
 
-      {sec('💬','Шаблоны сообщений','Готовые тексты для частых ситуаций',
+      {sec('💬','Шаблоны ответов','Бот использует их дословно в нужной ситуации. Не дублируй первое сообщение — оно задаётся в настройках бизнеса.',
         <div style={{display:'flex',flexDirection:'column',gap:12}}>
           {tpls.map((t,i)=>(
             <div key={t.id} style={{background:'var(--bg-page)',border:'1px solid var(--line)',borderRadius:8,padding:'14px 16px'}}>
