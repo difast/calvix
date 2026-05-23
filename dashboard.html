@@ -1740,7 +1740,7 @@ function ProfileDropdown({auth,onLogout,onEditProfile,onChangePassword}){
   function toggleTheme(){const t=theme==='light'?'dark':'light';setTheme(t);applyTheme(t,themeKey(auth));setOpen(false);}
   const isDark=theme==='dark';
   return(
-    <div style={{position:'relative'}} ref={ref}>
+    <><div style={{position:'relative'}} ref={ref}>
       <button className="profile-btn" onClick={()=>setOpen(o=>!o)}>
         <div className="profile-avatar">{initials}</div>
         <span style={{maxWidth:130,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{displayName}</span>
@@ -1774,6 +1774,7 @@ function ProfileDropdown({auth,onLogout,onEditProfile,onChangePassword}){
       )}
     </div>
     {showHelp&&<HelpModal onClose={()=>setShowHelp(false)}/>}
+    </>
   );
 }
 
