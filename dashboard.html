@@ -2099,16 +2099,22 @@ function UserCabinet({auth:initialAuth,onLogout}){
       {showPlatform&&<PlatformModal auth={authData} onClose={()=>{setShowPlatform(false);reloadBusinesses();}}/>}
 
       <div className="page">
-        {!authData.business_name&&!showPlatform&&tab==='overview'&&(
-          <div style={{background:'rgba(250,204,21,.08)',border:'1px solid rgba(250,204,21,.25)',borderRadius:'var(--radius)',padding:'14px 20px',marginBottom:20,fontSize:13,color:'var(--ink-2)',display:'flex',alignItems:'center',gap:12}}>
-            <span style={{fontSize:20}}>⚡</span>
-            <div><strong>Создайте первого бота!</strong> Нажмите кнопку <strong>⚙️ Платформа</strong> в шапке, чтобы добавить бизнес и запустить AI-продавца.</div>
-          </div>
-        )}
-        {tab==='overview'  &&<OverviewTab  auth={authData} period={period} bizFilter={bizName} allBusinesses={businesses}/>}
-        {tab==='leads'     &&<LeadsTab     auth={authData} bizLock={authData.business_name||undefined}/>}
-        {tab==='bookings'  &&<BookingsTab  auth={authData} bizLock={authData.business_name||undefined}/>}
-        {tab==='analytics' &&<AnalyticsTab auth={authData}/>}
+        {(()=>{
+          const hasBiz=!!(authData.business_name);
+          const NoBizCard=()=>(
+            <div className="coming-card">
+              <div className="coming-icon">🤖</div>
+              <div className="coming-title">Создайте своего бота</div>
+              <div className="coming-sub">Нажмите ⚙️ Платформа в шапке, чтобы добавить бизнес и запустить AI-продавца.</div>
+              <button className="btn btn-primary" style={{marginTop:20}} onClick={()=>setShowPlatform(true)}>⚙️ Открыть Платформу</button>
+            </div>
+          );
+          if(tab==='overview')   return hasBiz?<OverviewTab  auth={authData} period={period} bizFilter={bizName} allBusinesses={businesses}/>:<NoBizCard/>;
+          if(tab==='leads')      return hasBiz?<LeadsTab     auth={authData} bizLock={authData.business_name}/>:<NoBizCard/>;
+          if(tab==='bookings')   return hasBiz?<BookingsTab  auth={authData} bizLock={authData.business_name}/>:<NoBizCard/>;
+          if(tab==='analytics')  return hasBiz?<AnalyticsTab auth={authData}/>:<NoBizCard/>;
+          return null;
+        })()}
         {tab==='telephony' &&(
           <div className="coming-card">
             <div className="coming-icon">📞</div>
