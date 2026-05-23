@@ -146,7 +146,13 @@ select.sel option{background:#0d2b1f;color:#fff;}
   background:var(--bg-card);border:1px solid var(--line);
   border-radius:var(--radius);padding:20px 20px 22px;
   box-shadow:var(--shadow);position:relative;overflow:hidden;
+  transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease;cursor:default;
 }
+.kpi-card:hover{transform:translateY(-3px);box-shadow:0 8px 28px rgba(13,43,31,.13);border-color:var(--kpi-color);}
+.stat-mini{transition:transform .18s ease,box-shadow .18s ease,background .18s ease;}
+.stat-mini:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(13,43,31,.11);}
+.biz-card{transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease;}
+.biz-card:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(13,43,31,.1);border-color:rgba(22,163,74,.4);}
 .kpi-card::after{
   content:'';position:absolute;inset:0;border-radius:var(--radius);
   border-top:3px solid var(--kpi-color);pointer-events:none;
@@ -663,7 +669,7 @@ function OverviewTab({auth,period,bizFilter}){
               {l:'Записей',v:platform?.total_bookings??kpi.bookings,c:'#a78bfa'},
               {l:'Онлайн',v:platform?.active_bots??'—',c:'#4ade80'},
             ].map(s=>(
-              <div key={s.l} style={{background:'rgba(255,255,255,.06)',borderRadius:8,padding:'10px 12px',textAlign:'center'}}>
+              <div key={s.l} className="stat-mini" style={{background:'rgba(255,255,255,.06)',borderRadius:8,padding:'10px 12px',textAlign:'center',cursor:'default'}}>
                 <div className="mono" style={{fontSize:20,fontWeight:700,color:s.c,lineHeight:1}}>{s.v??'—'}</div>
                 <div style={{fontSize:10,color:'rgba(255,255,255,.35)',marginTop:4,textTransform:'uppercase',letterSpacing:'.05em'}}>{s.l}</div>
               </div>
@@ -671,14 +677,14 @@ function OverviewTab({auth,period,bizFilter}){
           </div>
         </div>
 
-        <div style={{fontSize:11,fontWeight:600,color:'var(--ink-3)',textTransform:'uppercase',letterSpacing:'.05em',paddingLeft:2}}>Бизнесы</div>
+        <div style={{fontSize:11,fontWeight:600,color:'var(--ink-3)',textTransform:'uppercase',letterSpacing:'.05em',paddingLeft:2}}>Бизнесы <span style={{color:'var(--ink-4)',fontWeight:400,textTransform:'none',fontSize:10}}>({businesses.length})</span></div>
         {businesses.length===0
           ?<div style={{background:'var(--bg-card)',border:'1px solid var(--line)',borderRadius:'var(--radius)',padding:20,textAlign:'center',color:'var(--ink-4)',fontSize:12}}>Нет данных</div>
           :businesses.map(b=>{
             const online=onlineIds.has(b.id);
             return(
-              <div key={b.id} style={{background:'var(--bg-card)',border:'1px solid var(--line)',borderRadius:'var(--radius)',padding:'14px 16px',boxShadow:'var(--shadow)'}}>
-                <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
+              <div key={b.id} className="biz-card" style={{background:'var(--bg-card)',border:'1px solid var(--line)',borderRadius:'var(--radius)',padding:'12px 14px',boxShadow:'var(--shadow)'}}>
+                <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
                   <span style={{fontWeight:600,fontSize:13,flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{b.name}</span>
                   <span style={{display:'inline-flex',alignItems:'center',gap:3,padding:'2px 7px',borderRadius:999,fontSize:10,fontWeight:700,
                     background:online?'#f0fdf4':'#f8fafc',color:online?'#166534':'var(--ink-4)',
@@ -686,16 +692,16 @@ function OverviewTab({auth,period,bizFilter}){
                     <span style={{width:5,height:5,borderRadius:'50%',background:online?'#22c55e':'#cbd5e1',display:'inline-block'}}/>
                     {online?'Online':'Offline'}
                   </span>
+                  {!b.is_active&&<span style={{padding:'2px 6px',borderRadius:999,fontSize:10,fontWeight:600,background:'#fff5f5',color:'#991b1b',border:'1px solid #fca5a5'}}>⏸</span>}
                 </div>
-                <div style={{display:'flex',gap:0,borderRadius:8,overflow:'hidden',border:'1px solid var(--line)'}}>
+                <div style={{display:'flex',gap:0,borderRadius:7,overflow:'hidden',border:'1px solid var(--line)'}}>
                   {[{l:'Лиды',v:b.stats?.total_leads??0,c:'var(--c4)'},{l:'HOT',v:b.stats?.hot_leads??0,c:'var(--c3)'},{l:'Записи',v:b.stats?.bookings??0,c:'var(--c2)'}].map((s,i)=>(
-                    <div key={s.l} style={{flex:1,textAlign:'center',padding:'8px 4px',background:i%2===0?'var(--bg-page)':'var(--bg-card)',borderRight:i<2?'1px solid var(--line)':'none'}}>
-                      <div style={{fontWeight:700,fontSize:16,color:s.c,lineHeight:1}}>{s.v}</div>
+                    <div key={s.l} style={{flex:1,textAlign:'center',padding:'7px 4px',background:'var(--bg-page)',borderRight:i<2?'1px solid var(--line)':'none'}}>
+                      <div style={{fontWeight:700,fontSize:15,color:s.c,lineHeight:1}}>{s.v}</div>
                       <div style={{fontSize:9,color:'var(--ink-4)',textTransform:'uppercase',letterSpacing:'.04em',marginTop:3}}>{s.l}</div>
                     </div>
                   ))}
                 </div>
-                {!b.is_active&&<div style={{marginTop:8,padding:'4px 8px',borderRadius:6,background:'#fff5f5',color:'#991b1b',fontSize:11,fontWeight:600,border:'1px solid #fca5a5',textAlign:'center'}}>⏸ Бот отключён</div>}
               </div>
             );
           })
@@ -1013,11 +1019,11 @@ function AnalyticsTab({auth}){
         </div>
       </div>
 
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:16}}>
+      {card('📈 Лиды по дням',<LeadsByDayChart/>,true)}
+      <div style={{display:'grid',gridTemplateColumns:'3fr 2fr',gap:16,marginTop:16}}>
         {card('📊 Воронка конверсии',<FunnelChart/>)}
         {card('🎯 Топ триггерных слов',<TriggerWordsChart/>)}
       </div>
-      {card('📈 Лиды по дням',<LeadsByDayChart/>,true)}
     </div>
   );
 }
@@ -1057,7 +1063,7 @@ function BookingsTab({auth}){
     <div>
       <div style={{display:'flex',gap:12,marginBottom:20}}>
         {[{l:'Всего',v:counts.total,col:'var(--ink)'},{l:'Ожидает',v:counts.pending,col:'#d48806'},{l:'Проведено',v:counts.done,col:'var(--c1)'},{l:'Отменено',v:counts.cancelled,col:'var(--danger)'}].map(s=>(
-          <div key={s.l} style={{background:'var(--bg-card)',border:'1px solid var(--line)',borderRadius:'var(--radius)',padding:'14px 20px',boxShadow:'var(--shadow)',flex:1,textAlign:'center'}}>
+          <div key={s.l} className="stat-mini" style={{background:'var(--bg-card)',border:'1px solid var(--line)',borderRadius:'var(--radius)',padding:'14px 20px',boxShadow:'var(--shadow)',flex:1,textAlign:'center'}}>
             <div className="mono" style={{fontSize:26,fontWeight:700,color:s.col}}>{s.v}</div>
             <div style={{fontSize:12,color:'var(--ink-3)',marginTop:2}}>{s.l}</div>
           </div>
