@@ -920,7 +920,7 @@ function LeadsTab({auth, bizLock}){
         :leads.length===0?<div style={{textAlign:'center',padding:44,color:'var(--ink-4)'}}>Лиды не найдены</div>
         :<>
           <div className="table-scroll"><table>
-            <thead><tr><th>#</th><th>Имя / Username</th><th>Бизнес</th><th>Телефон</th><th>Статус</th><th>Триггер</th><th>Создан</th></tr></thead>
+            <thead><tr><th>#</th><th>Имя / Username</th><th>Бизнес</th><th>Телефон</th><th>Статус</th><th>Триггер</th><th>📅 Звонок / Встреча</th><th>Создан</th></tr></thead>
             <tbody>
               {leads.map(l=>(
                 <tr key={l.id} className="clickable" onClick={()=>setSelected(l)}>
@@ -943,6 +943,9 @@ function LeadsTab({auth, bizLock}){
                     </div>
                   </td>
                   <td>{l.trigger_word?<span className="chip-trigger">🎯 {l.trigger_word}</span>:<span style={{color:'var(--ink-4)'}}>—</span>}</td>
+                  <td className="td-date" style={{whiteSpace:'nowrap',color:l.scheduled_at?'var(--c1)':'var(--ink-4)',fontWeight:l.scheduled_at?600:400}}>
+                    {l.scheduled_at?fmtDT(l.scheduled_at):'—'}
+                  </td>
                   <td className="td-date">{fmtDate(l.created_at)}</td>
                 </tr>
               ))}

@@ -514,6 +514,14 @@ async def list_leads(request):
         biz_result = await session.execute(select(Business).where(Business.id.in_(biz_ids)))
         biz_map = {b.id: b.name for b in biz_result.scalars().all()}
 
+        lead_ids = [l.id for l in leads]
+        booking_result = await session.execute(
+            select(Booking.lead_id, func.max(Booking.scheduled_at).label("scheduled_at"))
+            .where(Booking.lead_id.in_(lead_ids))
+            .group_by(Booking.lead_id)
+        )
+        scheduled_map = {row.lead_id: row.scheduled_at for row in booking_result.all()}
+
         data = [
             {
                 "id": l.id,
@@ -524,6 +532,7 @@ async def list_leads(request):
                 "full_name": l.full_name or "",
                 "status": l.status or "COLD",
                 "phone": l.phone or "",
+                "scheduled_at": scheduled_map[l.id].isoformat() if scheduled_map.get(l.id) else None,
                 "last_active": l.last_active.isoformat() if l.last_active else None,
                 "created_at": l.created_at.isoformat() if l.created_at else None,
             }
@@ -550,11 +559,12 @@ async def export_leads_csv(request):
 
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["ID", "Бизнес", "Имя", "Username", "Телефон", "Статус", "Дата"])
+    writer.writerow(["ID", "Бизнес", "Имя", "Username", "Телефон", "Статус", "Звонок/Встреча", "Дата"])
     for lead, biz_name in rows:
         writer.writerow([
             lead.id, biz_name, lead.full_name or "", lead.username or "",
             lead.phone or "", lead.status or "COLD",
+            "",
             lead.created_at.strftime("%d.%m.%Y %H:%M") if lead.created_at else "",
         ])
 
